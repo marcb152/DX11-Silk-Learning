@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 using System.Runtime.CompilerServices;
 using Silk.NET.Core.Native;
@@ -39,29 +40,10 @@ public class PeanutWindow
         0, 1, 3,
         1, 2, 3
     ];
-
-    private uint vertexStride = 3U * sizeof(float);
-    private uint vertexOffset = 0U;
-
-    private const string shaderSource = @"
-struct vs_in {
-    float3 position_local : POS;
-};
-
-struct vs_out {
-    float4 position_clip : SV_POSITION;
-};
-
-vs_out vs_main(vs_in input) {
-    vs_out output = (vs_out)0;
-    output.position_clip = float4(input.position_local, 1.0);
-    return output;
-}
-
-float4 ps_main(vs_out input) : SV_TARGET {
-    return float4( 1.0, 0.5, 0.2, 1.0 );
-}
-";
+    
+    
+    uint vertexStride = 3u * sizeof(float);
+    uint vertexOffset = 0u;
 
     private IWindow? window;
 
@@ -194,15 +176,64 @@ float4 ps_main(vs_out input) : SV_TARGET {
         // Gets released when the execution leaves the scope thanks to using.
         using var backbuffer = swapchain.GetBuffer<ID3D11Texture2D>(0);
         // Create a view over the render target.
-        try
+        SilkMarshal.ThrowHResult(device.CreateRenderTargetView(backbuffer, null, ref renderTargetView));
+        
+        // Creating vertex buffer data
+        BufferDesc bufferDesc = new BufferDesc()
         {
-            SilkMarshal.ThrowHResult(device.CreateRenderTargetView(ref Unsafe.NullRef<ID3D11Resource>(), null, ref renderTargetView));
-        }
-        catch (Exception e)
+            Usage = Usage.Default,
+            ByteWidth = (uint)vertices.Length * sizeof(float),
+            MiscFlags = 0u,
+            CPUAccessFlags = 0u,
+            StructureByteStride = sizeof(float),
+            BindFlags = (uint)BindFlag.VertexBuffer,
+        };
+        fixed (float* vertexData = vertices)
         {
-            Console.WriteLine(e);
-            throw;
+            SubresourceData subresourceData = new SubresourceData
+            {
+                PSysMem = vertexData
+            };
+            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref vertexBuffer));
         }
+        
+        // Compiling vertex shader blob
+        string path = Path.Combine(Directory.GetCurrentDirectory(),
+            "Shaders/VertexShader.hlsl");
+        var shaderBytes = File.ReadAllBytes(path);
+
+        // Compile vertex shader.
+        ComPtr<ID3D10Blob> vertexCode = default;
+        ComPtr<ID3D10Blob> vertexErrors = default;
+        HResult hr = compiler.Compile
+        (
+            in shaderBytes[0],
+            (nuint) shaderBytes.Length,
+            nameof(path),
+            null,
+            ref Unsafe.NullRef<ID3DInclude>(),
+            "vs_main",
+            "vs_5_0",
+            0,
+            0,
+            ref vertexCode,
+            ref vertexErrors
+        );
+        // Check for compilation errors.
+        if (hr.IsFailure)
+        {
+            if (vertexErrors.Handle is not null)
+            {
+                Console.WriteLine(SilkMarshal.PtrToString((nint) vertexErrors.GetBufferPointer()));
+            }
+            hr.Throw();
+        }
+        // Register shader
+        SilkMarshal.ThrowHResult(device.CreateVertexShader(
+            vertexCode.GetBufferPointer(), vertexCode.GetBufferSize(),
+            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
+
+        // bind vertex shader
     }
 
     private void OnUpdate(double deltaSeconds)
@@ -217,6 +248,13 @@ float4 ps_main(vs_out input) : SV_TARGET {
 
     private unsafe void OnRender(double deltaSeconds)
     {
+        BeginFrame(deltaSeconds);
+        Draw();
+        EndFrame();
+    }
+
+    private unsafe void BeginFrame(double deltaSeconds)
+    {
         elapsedTime += deltaSeconds;
         float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
         backgroundColour[0] = c;
@@ -224,7 +262,22 @@ float4 ps_main(vs_out input) : SV_TARGET {
 
         // Clear the render target to be all black ahead of rendering.
         deviceContext.ClearRenderTargetView(renderTargetView, ref backgroundColour[0]);
+    }
 
+    private unsafe void Draw()
+    {
+        // Registering vertex buffer
+        deviceContext.IASetVertexBuffers(
+            0u, 1u,
+            ref vertexBuffer, (uint) vertices.Length * sizeof(float), 0u);
+        
+        deviceContext.VSSetShader(vertexShader, null, 0u);
+        
+        deviceContext.Draw((uint)vertices.Length, 0u);
+    }
+
+    private unsafe void EndFrame()
+    {
         // Presenting the backbuffer to the swapchain.
         HResult hr = swapchain.Present(1u, 0u);
         if (hr.IsFailure)
