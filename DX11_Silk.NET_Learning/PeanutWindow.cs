@@ -6,6 +6,7 @@
 // TODO investigate making the D3DPrimitiveTopology enum more user friendly                                           //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+using System.Diagnostics;
 using System.Text;
 using System.Runtime.CompilerServices;
 using Silk.NET.Core.Native;
@@ -21,6 +22,8 @@ namespace DX11_Silk.NET_Learning;
 public class PeanutWindow
 {
     private float[] backgroundColour = [0.0f, 0.0f, 0.0f, 1.0f];
+
+    private double elapsedTime = 0.0f;
 
     private float[] vertices =
     [
@@ -75,6 +78,7 @@ float4 ps_main(vs_out input) : SV_TARGET {
     private ComPtr<IDXGISwapChain1> swapchain = default;
     private ComPtr<ID3D11Device> device = default;
     private ComPtr<ID3D11DeviceContext> deviceContext = default;
+    private ComPtr<ID3D11RenderTargetView> renderTargetView = default;
     private ComPtr<ID3D11Buffer> vertexBuffer = default;
     private ComPtr<ID3D11Buffer> indexBuffer = default;
     private ComPtr<ID3D11VertexShader> vertexShader = default;
@@ -104,6 +108,7 @@ float4 ps_main(vs_out input) : SV_TARGET {
         swapchain.Dispose();
         device.Dispose();
         deviceContext.Dispose();
+        renderTargetView.Dispose();
         vertexBuffer.Dispose();
         indexBuffer.Dispose();
         vertexShader.Dispose();
@@ -133,18 +138,42 @@ float4 ps_main(vs_out input) : SV_TARGET {
             keyboard.KeyDown += OnKeyDown;
         }
 
-        // Create our D3D11 logical device.
-        SilkMarshal.ThrowHResult
-        (
-            d3d11.CreateDevice
-            (
+        SwapChainDesc swapChainDesc = new SwapChainDesc
+        {
+            BufferDesc =
+            {
+                Width = 0,
+                Height = 0,
+                Format = Format.FormatB8G8R8A8Unorm,
+                RefreshRate = new Rational(0, 0),
+                Scaling = ModeScaling.Unspecified,
+                ScanlineOrdering = ModeScanlineOrder.Unspecified,
+            },
+            SampleDesc =
+            {
+                Count = 1,
+                Quality = 0,
+            },
+            BufferCount = 2,
+            BufferUsage = DXGI.UsageRenderTargetOutput,
+            SwapEffect = SwapEffect.Discard,
+            Windowed = true,
+            OutputWindow = window.Native!.DXHandle!.Value,
+            Flags = 0,
+        };
+
+        // Create device and front/back buffers, and swap chain and rendering context
+        SilkMarshal.ThrowHResult(
+            d3d11.CreateDeviceAndSwapChain(
                 default(ComPtr<IDXGIAdapter>),
                 D3DDriverType.Hardware,
-                Software: default,
+                default,
                 (uint)CreateDeviceFlag.Debug,
                 null,
                 0,
                 D3D11.SdkVersion,
+                in swapChainDesc,
+                ref swapchain,
                 ref device,
                 null,
                 ref deviceContext
@@ -156,188 +185,24 @@ float4 ps_main(vs_out input) : SV_TARGET {
         if (OperatingSystem.IsWindows())
         {
             // Log debug messages for this device (given that we've enabled the debug flag). Don't do this in release code!
-            device.SetInfoQueueCallback(msg => Console.WriteLine(SilkMarshal.PtrToString((nint)msg.PDescription)));
-        }
-
-        // Create our swapchain.
-        var swapChainDesc = new SwapChainDesc1
-        {
-            BufferCount = 2, // double buffered
-            Format = Format.FormatB8G8R8A8Unorm,
-            BufferUsage = DXGI.UsageRenderTargetOutput,
-            SwapEffect = SwapEffect.FlipDiscard,
-            SampleDesc = new SampleDesc(1, 0)
-        };
-
-        // Create our DXGI factory to allow us to create a swapchain.
-        factory = dxgi.CreateDXGIFactory<IDXGIFactory2>();
-
-        // Create the swapchain.
-        SilkMarshal.ThrowHResult
-        (
-            factory.CreateSwapChainForHwnd
-            (
-                device,
-                window.Native!.DXHandle!.Value,
-                in swapChainDesc,
-                null,
-                ref Unsafe.NullRef<IDXGIOutput>(),
-                ref swapchain
-            )
-        );
-
-        // Create our vertex buffer.
-        var bufferDesc = new BufferDesc
-        {
-            ByteWidth = (uint)(vertices.Length * sizeof(float)),
-            Usage = Usage.Default,
-            BindFlags = (uint)BindFlag.VertexBuffer
-        };
-
-        fixed (float* vertexData = vertices)
-        {
-            var subresourceData = new SubresourceData
+            device.SetInfoQueueCallback(msg =>
             {
-                PSysMem = vertexData
-            };
-
-            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref vertexBuffer));
+                Console.WriteLine(SilkMarshal.PtrToString((nint)msg.PDescription));
+            });
         }
-
-        // Create our index buffer.
-        bufferDesc = new BufferDesc
+        // Obtain the framebuffer for the swapchain's backbuffer.
+        // Gets released when the execution leaves the scope thanks to using.
+        using var backbuffer = swapchain.GetBuffer<ID3D11Texture2D>(0);
+        // Create a view over the render target.
+        try
         {
-            ByteWidth = (uint)(indices.Length * sizeof(uint)),
-            Usage = Usage.Default,
-            BindFlags = (uint)BindFlag.IndexBuffer
-        };
-
-        fixed (uint* indexData = indices)
-        {
-            var subresourceData = new SubresourceData
-            {
-                PSysMem = indexData
-            };
-
-            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref indexBuffer));
+            SilkMarshal.ThrowHResult(device.CreateRenderTargetView(ref Unsafe.NullRef<ID3D11Resource>(), null, ref renderTargetView));
         }
-
-        var shaderBytes = Encoding.ASCII.GetBytes(shaderSource);
-
-        // Compile vertex shader.
-        ComPtr<ID3D10Blob> vertexCode = default;
-        ComPtr<ID3D10Blob> vertexErrors = default;
-        HResult hr = compiler.Compile
-        (
-            in shaderBytes[0],
-            (nuint)shaderBytes.Length,
-            nameof(shaderSource),
-            null,
-            ref Unsafe.NullRef<ID3DInclude>(),
-            "vs_main",
-            "vs_5_0",
-            0,
-            0,
-            ref vertexCode,
-            ref vertexErrors
-        );
-
-        // Check for compilation errors.
-        if (hr.IsFailure)
+        catch (Exception e)
         {
-            if (vertexErrors.Handle is not null)
-            {
-                Console.WriteLine(SilkMarshal.PtrToString((nint)vertexErrors.GetBufferPointer()));
-            }
-
-            hr.Throw();
+            Console.WriteLine(e);
+            throw;
         }
-
-        // Compile pixel shader.
-        ComPtr<ID3D10Blob> pixelCode = default;
-        ComPtr<ID3D10Blob> pixelErrors = default;
-        hr = compiler.Compile
-        (
-            in shaderBytes[0],
-            (nuint)shaderBytes.Length,
-            nameof(shaderSource),
-            null,
-            ref Unsafe.NullRef<ID3DInclude>(),
-            "ps_main",
-            "ps_5_0",
-            0,
-            0,
-            ref pixelCode,
-            ref pixelErrors
-        );
-
-        // Check for compilation errors.
-        if (hr.IsFailure)
-        {
-            if (pixelErrors.Handle is not null)
-            {
-                Console.WriteLine(SilkMarshal.PtrToString((nint)pixelErrors.GetBufferPointer()));
-            }
-
-            hr.Throw();
-        }
-
-        // Create vertex shader.
-        SilkMarshal.ThrowHResult
-        (
-            device.CreateVertexShader
-            (
-                vertexCode.GetBufferPointer(),
-                vertexCode.GetBufferSize(),
-                ref Unsafe.NullRef<ID3D11ClassLinkage>(),
-                ref vertexShader
-            )
-        );
-
-        // Create pixel shader.
-        SilkMarshal.ThrowHResult
-        (
-            device.CreatePixelShader
-            (
-                pixelCode.GetBufferPointer(),
-                pixelCode.GetBufferSize(),
-                ref Unsafe.NullRef<ID3D11ClassLinkage>(),
-                ref pixelShader
-            )
-        );
-
-        // Describe the layout of the input data for the shader.
-        fixed (byte* name = SilkMarshal.StringToMemory("POS"))
-        {
-            var inputElement = new InputElementDesc
-            {
-                SemanticName = name,
-                SemanticIndex = 0,
-                Format = Format.FormatR32G32B32Float,
-                InputSlot = 0,
-                AlignedByteOffset = 0,
-                InputSlotClass = InputClassification.PerVertexData,
-                InstanceDataStepRate = 0
-            };
-
-            SilkMarshal.ThrowHResult
-            (
-                device.CreateInputLayout
-                (
-                    in inputElement,
-                    1,
-                    vertexCode.GetBufferPointer(),
-                    vertexCode.GetBufferSize(),
-                    ref inputLayout
-                )
-            );
-        }
-
-        // Clean up any resources.
-        vertexCode.Dispose();
-        vertexErrors.Dispose();
-        pixelCode.Dispose();
-        pixelErrors.Dispose();
     }
 
     private void OnUpdate(double deltaSeconds)
@@ -348,50 +213,25 @@ float4 ps_main(vs_out input) : SV_TARGET {
 
     private unsafe void OnFramebufferResize(Vector2D<int> newSize)
     {
-        // If the window resizes, we need to be sure to update the swapchain's back buffers.
-        SilkMarshal.ThrowHResult
-        (
-            swapchain.ResizeBuffers(0, (uint)newSize.X, (uint)newSize.Y, Format.FormatB8G8R8A8Unorm, 0)
-        );
     }
 
     private unsafe void OnRender(double deltaSeconds)
     {
-        // Obtain the framebuffer for the swapchain's backbuffer.
-        using var framebuffer = swapchain.GetBuffer<ID3D11Texture2D>(0);
-
-        // Create a view over the render target.
-        ComPtr<ID3D11RenderTargetView> renderTargetView = default;
-        SilkMarshal.ThrowHResult(device.CreateRenderTargetView(framebuffer, null, ref renderTargetView));
+        elapsedTime += deltaSeconds;
+        float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
+        backgroundColour[0] = c;
+        backgroundColour[1] = c;
 
         // Clear the render target to be all black ahead of rendering.
         deviceContext.ClearRenderTargetView(renderTargetView, ref backgroundColour[0]);
 
-        // Update the rasterizer state with the current viewport.
-        var viewport = new Viewport(0, 0, window.FramebufferSize.X, window.FramebufferSize.Y, 0, 1);
-        deviceContext.RSSetViewports(1, in viewport);
-
-        // Tell the output merger about our render target view.
-        deviceContext.OMSetRenderTargets(1, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
-
-        // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
-        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist);
-        deviceContext.IASetInputLayout(inputLayout);
-        deviceContext.IASetVertexBuffers(0, 1, vertexBuffer, in vertexStride, in vertexOffset);
-        deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR32Uint, 0);
-
-        // Bind our shaders.
-        deviceContext.VSSetShader(vertexShader, ref Unsafe.NullRef<ComPtr<ID3D11ClassInstance>>(), 0);
-        deviceContext.PSSetShader(pixelShader, ref Unsafe.NullRef<ComPtr<ID3D11ClassInstance>>(), 0);
-
-        // Draw the quad.
-        deviceContext.DrawIndexed(6, 0, 0);
-
-        // Present the drawn image.
-        swapchain.Present(1, 0);
-
-        // Clean up any resources created in this method.
-        renderTargetView.Dispose();
+        // Presenting the backbuffer to the swapchain.
+        HResult hr = swapchain.Present(1u, 0u);
+        if (hr.IsFailure)
+        {
+            SilkMarshal.ThrowHResult(hr);
+            // TODO: Handle device removed or reset.
+        }
     }
 
     private void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
