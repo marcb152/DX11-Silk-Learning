@@ -290,11 +290,12 @@ public class PeanutWindow
         deviceContext.IASetInputLayout(inputLayout);
         deviceContext.IASetVertexBuffers(
             0u, 1u,
+            // Stride is the byte-size of a single vertex (3 floats)
             ref vertexBuffer, sizeof(float) * 3u, 0u);
         
         deviceContext.VSSetShader(vertexShader, null, 0u);
         
-        deviceContext.Draw((uint)vertices.Length, 0u);
+        deviceContext.Draw((uint)(vertices.Length / 3), 0u);
     }
 
     private unsafe void EndFrame()
