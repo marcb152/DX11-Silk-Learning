@@ -20,13 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Shaders\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="Shaders\VertexShader.hlsl">
+      <Generator></Generator>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
 </Project>

@@ -200,7 +200,8 @@ public class PeanutWindow
         // Compiling vertex shader blob
         string path = Path.Combine(Directory.GetCurrentDirectory(),
             "Shaders/VertexShader.hlsl");
-        var shaderBytes = File.ReadAllBytes(path);
+
+        var shaderBytes = Encoding.ASCII.GetBytes(File.ReadAllText(path));
 
         // Compile vertex shader.
         ComPtr<ID3D10Blob> vertexCode = default;
@@ -209,10 +210,10 @@ public class PeanutWindow
         (
             in shaderBytes[0],
             (nuint) shaderBytes.Length,
-            nameof(path),
+            null as string,
             null,
             ref Unsafe.NullRef<ID3DInclude>(),
-            "vs_main",
+            "main",
             "vs_5_0",
             0,
             0,
