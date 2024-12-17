@@ -31,8 +31,7 @@ public class PeanutWindow
         //  X      Y      Z
         0.5f,  0.5f,  0.0f,
         0.5f, -0.5f,  0.0f,
-        -0.5f, -0.5f,  0.0f,
-        -0.5f,  0.5f,  0.5f
+        -0.5f, -0.5f,  0.0f
     ];
 
     private uint[] indices =
@@ -41,10 +40,6 @@ public class PeanutWindow
         1, 2, 3
     ];
     
-    
-    uint vertexStride = 3u * sizeof(float);
-    uint vertexOffset = 0u;
-
     private IWindow? window;
 
     // Load the DXGI and Direct3D11 libraries for later use.
@@ -182,7 +177,7 @@ public class PeanutWindow
         BufferDesc bufferDesc = new BufferDesc()
         {
             Usage = Usage.Default,
-            ByteWidth = (uint)vertices.Length * sizeof(float),
+            ByteWidth = (uint)(vertices.Length * sizeof(float)),
             MiscFlags = 0u,
             CPUAccessFlags = 0u,
             StructureByteStride = sizeof(float),
@@ -235,13 +230,13 @@ public class PeanutWindow
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
 
         // Describe the layout of the input data for the shader.
-        fixed (byte* name = SilkMarshal.StringToMemory("POSITION"))
+        fixed (byte* name = SilkMarshal.StringToMemory("Position"))
         {
             InputElementDesc vertexStructureDesc = new InputElementDesc()
             {
                 SemanticName = name,
                 SemanticIndex = 0,
-                Format = Format.FormatR32G32Float,
+                Format = Format.FormatR32G32B32Float,
                 InputSlot = 0,
                 AlignedByteOffset = 0,
                 InputSlotClass = InputClassification.PerVertexData,
@@ -290,9 +285,12 @@ public class PeanutWindow
     private unsafe void Draw()
     {
         // Registering vertex buffer
+        // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
+        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist);
+        deviceContext.IASetInputLayout(inputLayout);
         deviceContext.IASetVertexBuffers(
             0u, 1u,
-            ref vertexBuffer, sizeof(float), 0u);
+            ref vertexBuffer, sizeof(float) * 3u, 0u);
         
         deviceContext.VSSetShader(vertexShader, null, 0u);
         
