@@ -234,7 +234,29 @@ public class PeanutWindow
             vertexCode.GetBufferPointer(), vertexCode.GetBufferSize(),
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
 
-        // bind vertex shader
+        // Describe the layout of the input data for the shader.
+        fixed (byte* name = SilkMarshal.StringToMemory("POSITION"))
+        {
+            InputElementDesc vertexStructureDesc = new InputElementDesc()
+            {
+                SemanticName = name,
+                SemanticIndex = 0,
+                Format = Format.FormatR32G32Float,
+                InputSlot = 0,
+                AlignedByteOffset = 0,
+                InputSlotClass = InputClassification.PerVertexData,
+                InstanceDataStepRate = 0
+            };
+
+            SilkMarshal.ThrowHResult(
+                device.CreateInputLayout(
+                    in vertexStructureDesc,
+                    1u,
+                    vertexCode.GetBufferPointer(),
+                    vertexCode.GetBufferSize(),
+                    ref inputLayout
+                ));
+        }
     }
 
     private void OnUpdate(double deltaSeconds)
@@ -270,7 +292,7 @@ public class PeanutWindow
         // Registering vertex buffer
         deviceContext.IASetVertexBuffers(
             0u, 1u,
-            ref vertexBuffer, (uint) vertices.Length * sizeof(float), 0u);
+            ref vertexBuffer, sizeof(float), 0u);
         
         deviceContext.VSSetShader(vertexShader, null, 0u);
         
