@@ -195,7 +195,6 @@ public class PeanutWindow
         // Compiling vertex shader blob
         string path = Path.Combine(Directory.GetCurrentDirectory(),
             "Shaders/VertexShader.hlsl");
-
         var shaderBytes = Encoding.ASCII.GetBytes(File.ReadAllText(path));
 
         // Compile vertex shader.
@@ -228,8 +227,8 @@ public class PeanutWindow
         SilkMarshal.ThrowHResult(device.CreateVertexShader(
             vertexCode.GetBufferPointer(), vertexCode.GetBufferSize(),
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
-
-        // Describe the layout of the input data for the shader.
+        
+        // Describe the layout of the input data for the vertex shader.
         fixed (byte* name = SilkMarshal.StringToMemory("Position"))
         {
             InputElementDesc vertexStructureDesc = new InputElementDesc()
@@ -252,6 +251,48 @@ public class PeanutWindow
                     ref inputLayout
                 ));
         }
+
+        vertexCode.Dispose();
+        vertexErrors.Dispose();
+        
+        // Compiling pixel shader blob
+        path = Path.Combine(Directory.GetCurrentDirectory(),
+            "Shaders/PixelShader.hlsl");
+        shaderBytes = Encoding.ASCII.GetBytes(File.ReadAllText(path));
+
+        // Compile pixel shader.
+        ComPtr<ID3D10Blob> pixelCode = default;
+        ComPtr<ID3D10Blob> pixelErrors = default;
+        hr = compiler.Compile
+        (
+            in shaderBytes[0],
+            (nuint) shaderBytes.Length,
+            null as string,
+            null,
+            ref Unsafe.NullRef<ID3DInclude>(),
+            "main",
+            "ps_5_0",
+            0,
+            0,
+            ref pixelCode,
+            ref pixelErrors
+        );
+        // Check for compilation errors.
+        if (hr.IsFailure)
+        {
+            if (pixelErrors.Handle is not null)
+            {
+                Console.WriteLine(SilkMarshal.PtrToString((nint) pixelErrors.GetBufferPointer()));
+            }
+            hr.Throw();
+        }
+        // Register shader
+        SilkMarshal.ThrowHResult(device.CreatePixelShader(
+            pixelCode.GetBufferPointer(), pixelCode.GetBufferSize(),
+            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pixelShader));
+        pixelCode.Dispose();
+        pixelErrors.Dispose();
+        
     }
 
     private void OnUpdate(double deltaSeconds)
@@ -262,6 +303,11 @@ public class PeanutWindow
 
     private unsafe void OnFramebufferResize(Vector2D<int> newSize)
     {
+        // If the window resizes, we need to be sure to update the swapchain's back buffers.
+        // SilkMarshal.ThrowHResult
+        // (
+        //     swapchain.ResizeBuffers(0, (uint) newSize.X, (uint) newSize.Y, Format.FormatUnknown, 0)
+        // );
     }
 
     private unsafe void OnRender(double deltaSeconds)
@@ -293,7 +339,24 @@ public class PeanutWindow
             // Stride is the byte-size of a single vertex (3 floats)
             ref vertexBuffer, sizeof(float) * 3u, 0u);
         
+        // Vertex Shader Stage
         deviceContext.VSSetShader(vertexShader, null, 0u);
+        // Pixel Shader Stage
+        deviceContext.PSSetShader(pixelShader, null, 0u);
+        
+        // Rasterizer stage
+        Viewport viewport = new Viewport
+        {
+            TopLeftX = 0,
+            TopLeftY = 0,
+            Width = window.FramebufferSize.X,
+            Height = window.FramebufferSize.Y,
+            MinDepth = 0.0f,
+            MaxDepth = 1.0f
+        };
+        deviceContext.RSSetViewports(1u, viewport);
+        // Output Merger stage
+        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
         
         deviceContext.Draw((uint)(vertices.Length / 3), 0u);
     }
