@@ -4,10 +4,15 @@ struct VSOut
 	float4 color : Color;
 };
 
+cbuffer Cbuffer
+{
+	matrix transform;
+}
+
 VSOut main( float3 pos : Position, float4 color : Color )
 {
 	VSOut output;
-	output.pos = float4(pos, 1.0f);
+	output.pos = mul(float4(pos, 1.0f), transform);
 	output.color = color;
 	return output;
 }

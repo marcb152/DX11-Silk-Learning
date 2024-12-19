@@ -41,6 +41,8 @@ public class PeanutWindow
         1, 2, 3
     ];
     
+    private Matrix4X4<float>[] constantBufferStruct;
+    
     private IWindow? window;
 
     // Load the DXGI and Direct3D11 libraries for later use.
@@ -59,6 +61,7 @@ public class PeanutWindow
     private ComPtr<ID3D11RenderTargetView> renderTargetView = default;
     private ComPtr<ID3D11Buffer> vertexBuffer = default;
     private ComPtr<ID3D11Buffer> indexBuffer = default;
+    private ComPtr<ID3D11Buffer> constantBuffer = default;
     private ComPtr<ID3D11VertexShader> vertexShader = default;
     private ComPtr<ID3D11PixelShader> pixelShader = default;
     private ComPtr<ID3D11InputLayout> inputLayout = default;
@@ -90,6 +93,7 @@ public class PeanutWindow
         vertexBuffer.Dispose();
         indexBuffer.Dispose();
         vertexShader.Dispose();
+        constantBuffer.Dispose();
         pixelShader.Dispose();
         inputLayout.Dispose();
         compiler.Dispose();
@@ -371,6 +375,33 @@ public class PeanutWindow
             // Stride is the byte-size of a single vertex (3 floats)
             ref vertexBuffer, (uint)sizeof(Vertex), 0u);
         deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR16Uint, 0u);
+        
+        // Set up the constant buffer
+        constantBufferStruct = [
+            Matrix4X4.Transpose(
+                Matrix4X4.CreateRotationZ((float)elapsedTime) *
+                Matrix4X4.CreateScale(3.0f / 4.0f, 1.0f, 1.0f)
+            ),
+        ];
+        // Update the constant buffer
+        BufferDesc bufferDesc = new BufferDesc()
+        {
+            Usage = Usage.Dynamic,
+            ByteWidth = (uint) sizeof(Matrix4X4<float>),
+            MiscFlags = 0u,
+            CPUAccessFlags = (uint)CpuAccessFlag.Write,
+            StructureByteStride = 0u,
+            BindFlags = (uint)BindFlag.ConstantBuffer,
+        };
+        fixed (void* constBuffer = constantBufferStruct)
+        {
+            SubresourceData subresourceData = new SubresourceData
+            {
+                PSysMem = constBuffer
+            };
+            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref constantBuffer));
+        }
+        deviceContext.VSSetConstantBuffers(0u, 1u, ref constantBuffer);
         
         // Vertex Shader Stage
         deviceContext.VSSetShader(vertexShader, null, 0u);
