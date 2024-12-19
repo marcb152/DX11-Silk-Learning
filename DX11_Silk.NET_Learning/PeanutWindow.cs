@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Runtime.CompilerServices;
+using DX11_Silk.NET_Learning.Models;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
@@ -26,15 +27,15 @@ public class PeanutWindow
 
     private double elapsedTime = 0.0f;
 
-    private float[] vertices =
+    private Vertex[] vertices =
     [
-        //  X      Y      Z
-        0.5f,  0.5f,  0.0f,
-        0.5f, -0.5f,  0.0f,
-        -0.5f, -0.5f,  0.0f
+        new Vertex() { x =  0.5f, y =  0.5f, z = 0.0f, color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
+        new Vertex() { x =  0.5f, y = -0.5f, z = 0.0f, color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
+        new Vertex() { x = -0.5f, y = -0.5f, z = 0.0f, color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
+        new Vertex() { x = -0.5f, y = 0.5f, z = 0.5f, color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
     ];
 
-    private uint[] indices =
+    private ushort[] indices =
     [
         0, 1, 3,
         1, 2, 3
@@ -177,19 +178,38 @@ public class PeanutWindow
         BufferDesc bufferDesc = new BufferDesc()
         {
             Usage = Usage.Default,
-            ByteWidth = (uint)(vertices.Length * sizeof(float)),
+            ByteWidth = (uint)(vertices.Length * sizeof(Vertex)),
             MiscFlags = 0u,
             CPUAccessFlags = 0u,
             StructureByteStride = sizeof(float),
             BindFlags = (uint)BindFlag.VertexBuffer,
         };
-        fixed (float* vertexData = vertices)
+        fixed (Vertex* vertexData = vertices)
         {
             SubresourceData subresourceData = new SubresourceData
             {
                 PSysMem = vertexData
             };
             SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref vertexBuffer));
+        }
+        
+        // Creating index buffer data
+        bufferDesc = new BufferDesc()
+        {
+            Usage = Usage.Default,
+            ByteWidth = (uint)(indices.Length * sizeof(ushort)),
+            MiscFlags = 0u,
+            CPUAccessFlags = 0u,
+            StructureByteStride = sizeof(ushort),
+            BindFlags = (uint)BindFlag.IndexBuffer,
+        };
+        fixed (ushort* indexData = indices)
+        {
+            SubresourceData subresourceData = new SubresourceData
+            {
+                PSysMem = indexData
+            };
+            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref indexBuffer));
         }
         
         // Compiling vertex shader blob
@@ -229,26 +249,38 @@ public class PeanutWindow
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
         
         // Describe the layout of the input data for the vertex shader.
-        fixed (byte* name = SilkMarshal.StringToMemory("Position"))
+        fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
+                    color = SilkMarshal.StringToMemory("Color"))
         {
-            InputElementDesc vertexStructureDesc = new InputElementDesc()
+            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [new InputElementDesc()
             {
-                SemanticName = name,
+                SemanticName = pos,
                 SemanticIndex = 0,
                 Format = Format.FormatR32G32B32Float,
                 InputSlot = 0,
                 AlignedByteOffset = 0,
                 InputSlotClass = InputClassification.PerVertexData,
                 InstanceDataStepRate = 0
-            };
+            },
+            new InputElementDesc()
+            {
+                SemanticName = color,
+                SemanticIndex = 0,
+                Format = Format.FormatB8G8R8A8Unorm,
+                InputSlot = 0,
+                AlignedByteOffset = D3D11.AppendAlignedElement,
+                InputSlotClass = InputClassification.PerVertexData,
+                InstanceDataStepRate = 0
+            },
+            ];
 
             SilkMarshal.ThrowHResult(
                 device.CreateInputLayout(
-                    in vertexStructureDesc,
-                    1u,
+                    vertexStructureDesc,
+                    (uint) vertexStructureDesc.Length,
                     vertexCode.GetBufferPointer(),
                     vertexCode.GetBufferSize(),
-                    ref inputLayout
+                    inputLayout.GetAddressOf()
                 ));
         }
 
@@ -332,12 +364,13 @@ public class PeanutWindow
     {
         // Registering vertex buffer
         // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
-        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist);
+        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglestrip);
         deviceContext.IASetInputLayout(inputLayout);
         deviceContext.IASetVertexBuffers(
             0u, 1u,
             // Stride is the byte-size of a single vertex (3 floats)
-            ref vertexBuffer, sizeof(float) * 3u, 0u);
+            ref vertexBuffer, (uint)sizeof(Vertex), 0u);
+        deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR16Uint, 0u);
         
         // Vertex Shader Stage
         deviceContext.VSSetShader(vertexShader, null, 0u);
@@ -358,7 +391,7 @@ public class PeanutWindow
         // Output Merger stage
         deviceContext.OMSetRenderTargets(1u, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
         
-        deviceContext.Draw((uint)(vertices.Length / 3), 0u);
+        deviceContext.DrawIndexed((uint)(indices.Length), 0u, 0);
     }
 
     private unsafe void EndFrame()
