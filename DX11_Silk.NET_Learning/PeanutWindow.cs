@@ -30,16 +30,24 @@ public class PeanutWindow
 
     private Vertex[] vertices =
     [
-        new Vertex() { x =  0.5f, y =  0.5f, z = 0.0f, color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
-        new Vertex() { x =  0.5f, y = -0.5f, z = 0.0f, color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
-        new Vertex() { x = -0.5f, y = -0.5f, z = 0.0f, color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
-        new Vertex() { x = -0.5f, y = 0.5f, z = 0.5f, color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
+        new Vertex() { x =  -1.0f, y =  -1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
+        new Vertex() { x =  1.0f, y = -1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
+        new Vertex() { x = -1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
+        new Vertex() { x = 1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
+        new Vertex() { x = -1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
+        new Vertex() { x = 1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
+        new Vertex() { x = -1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
+        new Vertex() { x = 1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
     ];
 
     private ushort[] indices =
     [
-        0, 1, 3,
-        1, 2, 3
+        0,2,1, 2,3,1,
+        1,3,5, 3,7,5,
+        2,6,3, 3,6,7,
+        4,5,7, 4,7,6,
+        0,4,2, 2,4,6,
+        0,1,4, 1,5,4
     ];
     
     private Matrix4X4<float>[] constantBufferStruct;
@@ -332,7 +340,6 @@ public class PeanutWindow
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pixelShader));
         pixelCode.Dispose();
         pixelErrors.Dispose();
-        
     }
 
     private void OnMouseMove(IMouse mouse, Vector2 position)
@@ -349,10 +356,30 @@ public class PeanutWindow
     private unsafe void OnFramebufferResize(Vector2D<int> newSize)
     {
         // If the window resizes, we need to be sure to update the swapchain's back buffers.
-        // SilkMarshal.ThrowHResult
-        // (
-        //     swapchain.ResizeBuffers(0, (uint) newSize.X, (uint) newSize.Y, Format.FormatUnknown, 0)
-        // );
+        // https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#handling-window-resizing
+        deviceContext.OMSetRenderTargets(0, null, ref Unsafe.NullRef<ID3D11DepthStencilView>());
+        renderTargetView.Dispose();
+        deviceContext.Flush();
+        
+        SilkMarshal.ThrowHResult
+        (
+            swapchain.ResizeBuffers(0u, (uint) newSize.X, (uint) newSize.Y, Format.FormatUnknown, 0)
+        );
+        
+        using var backbuffer = swapchain.GetBuffer<ID3D11Texture2D>(0);
+        SilkMarshal.ThrowHResult(device.CreateRenderTargetView(backbuffer, null, ref renderTargetView));
+        
+        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
+        Viewport viewport = new Viewport
+        {
+            TopLeftX = 0,
+            TopLeftY = 0,
+            Width = newSize.X,
+            Height = newSize.Y,
+            MinDepth = 0.0f,
+            MaxDepth = 1.0f
+        };
+        deviceContext.RSSetViewports(1u, viewport);
     }
 
     private unsafe void OnRender(double deltaSeconds)
@@ -391,7 +418,7 @@ public class PeanutWindow
         constantBufferStruct = [
             Matrix4X4.Transpose(
                 Matrix4X4.CreateRotationZ((float)elapsedTime) *
-                Matrix4X4.CreateScale(3.0f / 4.0f, 1.0f, 1.0f) *
+                Matrix4X4.CreateScale(window.FramebufferSize.Y / (float) window.FramebufferSize.X , 1.0f, 1.0f) *
                 Matrix4X4.CreateTranslation(x, y, 0.0f)
             ),
         ];
@@ -434,7 +461,7 @@ public class PeanutWindow
         // Output Merger stage
         deviceContext.OMSetRenderTargets(1u, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
         
-        deviceContext.DrawIndexed((uint)(indices.Length), 0u, 0);
+        deviceContext.DrawIndexed((uint)indices.Length, 0u, 0);
     }
 
     private unsafe void EndFrame()
