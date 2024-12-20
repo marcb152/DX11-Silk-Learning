@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using System.Diagnostics;
+using System.Numerics;
 using System.Reflection;
 using System.Text;
 using System.Runtime.CompilerServices;
@@ -23,7 +24,7 @@ namespace DX11_Silk.NET_Learning;
 
 public class PeanutWindow
 {
-    private float[] backgroundColour = [0.0f, 0.0f, 0.0f, 1.0f];
+    private float[] backgroundColor = [0.0f, 0.0f, 0.0f, 1.0f];
 
     private double elapsedTime = 0.0f;
 
@@ -42,6 +43,8 @@ public class PeanutWindow
     ];
     
     private Matrix4X4<float>[] constantBufferStruct;
+    
+    private Vector2 mousePos = new Vector2(0, 0);
     
     private IWindow? window;
 
@@ -119,6 +122,7 @@ public class PeanutWindow
         {
             keyboard.KeyDown += OnKeyDown;
         }
+        input.Mice[0].MouseMove += OnMouseMove;
 
         SwapChainDesc swapChainDesc = new SwapChainDesc
         {
@@ -331,6 +335,11 @@ public class PeanutWindow
         
     }
 
+    private void OnMouseMove(IMouse mouse, Vector2 position)
+    {
+        mousePos = position;
+    }
+
     private void OnUpdate(double deltaSeconds)
     {
         // Here all of the updates to program state ahead of rendering (e.g. physics) should be done. We don't have anything
@@ -357,11 +366,11 @@ public class PeanutWindow
     {
         elapsedTime += deltaSeconds;
         float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
-        backgroundColour[0] = c;
-        backgroundColour[1] = c;
+        backgroundColor[0] = c;
+        backgroundColor[1] = c;
 
         // Clear the render target to be all black ahead of rendering.
-        deviceContext.ClearRenderTargetView(renderTargetView, ref backgroundColour[0]);
+        deviceContext.ClearRenderTargetView(renderTargetView, backgroundColor);
     }
 
     private unsafe void Draw()
@@ -376,11 +385,14 @@ public class PeanutWindow
             ref vertexBuffer, (uint)sizeof(Vertex), 0u);
         deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR16Uint, 0u);
         
+        float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
+        float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
         // Set up the constant buffer
         constantBufferStruct = [
             Matrix4X4.Transpose(
                 Matrix4X4.CreateRotationZ((float)elapsedTime) *
-                Matrix4X4.CreateScale(3.0f / 4.0f, 1.0f, 1.0f)
+                Matrix4X4.CreateScale(3.0f / 4.0f, 1.0f, 1.0f) *
+                Matrix4X4.CreateTranslation(x, y, 0.0f)
             ),
         ];
         // Update the constant buffer
