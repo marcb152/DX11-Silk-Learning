@@ -49,8 +49,13 @@ public class PeanutWindow
         0,4,2, 2,4,6,
         0,1,4, 1,5,4
     ];
+
+    private struct ConstBuffStruct
+    {
+        public Matrix4X4<float> transform;
+    }
     
-    private Matrix4X4<float>[] constantBufferStruct;
+    private ConstBuffStruct constantBufferStruct;
     
     private Vector2 mousePos = new Vector2(0, 0);
     
@@ -392,9 +397,9 @@ public class PeanutWindow
     private unsafe void BeginFrame(double deltaSeconds)
     {
         elapsedTime += deltaSeconds;
-        float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
-        backgroundColor[0] = c;
-        backgroundColor[1] = c;
+        // float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
+        // backgroundColor[0] = c;
+        // backgroundColor[1] = c;
 
         // Clear the render target to be all black ahead of rendering.
         deviceContext.ClearRenderTargetView(renderTargetView, backgroundColor);
@@ -404,7 +409,7 @@ public class PeanutWindow
     {
         // Registering vertex buffer
         // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
-        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglestrip);
+        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglelist);
         deviceContext.IASetInputLayout(inputLayout);
         deviceContext.IASetVertexBuffers(
             0u, 1u,
@@ -415,24 +420,26 @@ public class PeanutWindow
         float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
         float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
         // Set up the constant buffer
-        constantBufferStruct = [
+        constantBufferStruct = new ConstBuffStruct() { transform = 
             Matrix4X4.Transpose(
+                Matrix4X4.CreateScale(0.5f) *
                 Matrix4X4.CreateRotationZ((float)elapsedTime) *
-                Matrix4X4.CreateScale(window.FramebufferSize.Y / (float) window.FramebufferSize.X , 1.0f, 1.0f) *
-                Matrix4X4.CreateTranslation(x, y, 0.0f)
-            ),
-        ];
+                Matrix4X4.CreateRotationX((float)elapsedTime) *
+                Matrix4X4.CreateTranslation(x, y, -10.0f) *
+                Matrix4X4.CreatePerspective(1, 3/4f, 0.5f, 100.0f)
+            )
+        };
         // Update the constant buffer
         BufferDesc bufferDesc = new BufferDesc()
         {
             Usage = Usage.Dynamic,
-            ByteWidth = (uint) sizeof(Matrix4X4<float>),
+            ByteWidth = (uint) sizeof(ConstBuffStruct),
             MiscFlags = 0u,
             CPUAccessFlags = (uint)CpuAccessFlag.Write,
             StructureByteStride = 0u,
             BindFlags = (uint)BindFlag.ConstantBuffer,
         };
-        fixed (void* constBuffer = constantBufferStruct)
+        fixed (void* constBuffer = &constantBufferStruct)
         {
             SubresourceData subresourceData = new SubresourceData
             {
