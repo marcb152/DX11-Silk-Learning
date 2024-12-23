@@ -57,7 +57,11 @@ public class PeanutWindow
     
     private ConstBuffStruct constantBufferStruct;
     
-    private Vector2 mousePos = new Vector2(0, 0);
+    private Vector2 mousePos = Vector2.Zero;
+    
+    private Vector2 cameraDir = Vector2.Zero;
+    private Vector3 cameraPos = new Vector3(0, 0, -10);
+    private float cameraSpeed = 10f;
     
     private IWindow? window;
 
@@ -134,6 +138,7 @@ public class PeanutWindow
         foreach (var keyboard in input.Keyboards)
         {
             keyboard.KeyDown += OnKeyDown;
+            keyboard.KeyUp += OnKeyUp;
         }
         input.Mice[0].MouseMove += OnMouseMove;
 
@@ -347,6 +352,7 @@ public class PeanutWindow
         pixelErrors.Dispose();
     }
 
+
     private void OnMouseMove(IMouse mouse, Vector2 position)
     {
         mousePos = position;
@@ -356,6 +362,8 @@ public class PeanutWindow
     {
         // Here all of the updates to program state ahead of rendering (e.g. physics) should be done. We don't have anything
         // to do here at the moment, so we've left it blank.
+        cameraPos.X += cameraDir.X * (float)deltaSeconds * cameraSpeed;
+        cameraPos.Y += cameraDir.Y * (float)deltaSeconds * cameraSpeed;
     }
 
     private unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -390,7 +398,7 @@ public class PeanutWindow
     private unsafe void OnRender(double deltaSeconds)
     {
         BeginFrame(deltaSeconds);
-        Draw();
+        Draw(deltaSeconds);
         EndFrame();
     }
 
@@ -405,7 +413,7 @@ public class PeanutWindow
         deviceContext.ClearRenderTargetView(renderTargetView, backgroundColor);
     }
 
-    private unsafe void Draw()
+    private unsafe void Draw(double deltaSeconds)
     {
         // Registering vertex buffer
         // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
@@ -419,13 +427,14 @@ public class PeanutWindow
         
         float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
         float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
+        
         // Set up the constant buffer
         constantBufferStruct = new ConstBuffStruct() { transform = 
             Matrix4X4.Transpose(
                 Matrix4X4.CreateScale(0.5f) *
                 Matrix4X4.CreateRotationZ((float)elapsedTime) *
                 Matrix4X4.CreateRotationX((float)elapsedTime) *
-                Matrix4X4.CreateTranslation(x, y, -10.0f) *
+                Matrix4X4.CreateTranslation(cameraPos.Y, 0f, cameraPos.X - 10f) *
                 Matrix4X4.CreatePerspective(1, 3/4f, 0.5f, 100.0f)
             )
         };
@@ -488,6 +497,40 @@ public class PeanutWindow
         if (key == Key.Escape)
         {
             window.Close();
+        }
+        switch (key)
+        {
+            case Key.W:
+                cameraDir.X = 1;
+                break;
+            case Key.S:
+                cameraDir.X = -1;
+                break;
+            case Key.A:
+                cameraDir.Y = 1;
+                break;
+            case Key.D:
+                cameraDir.Y = -1;
+                break;
+        }
+    }
+    
+    private void OnKeyUp(IKeyboard keyboard, Key key, int scancode)
+    {
+        switch (key)
+        {
+            case Key.W:
+                cameraDir.X = 0;
+                break;
+            case Key.S:
+                cameraDir.X = 0;
+                break;
+            case Key.A:
+                cameraDir.Y = 0;
+                break;
+            case Key.D:
+                cameraDir.Y = 0;
+                break;
         }
     }
 }
