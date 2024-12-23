@@ -88,6 +88,8 @@ public class PeanutWindow
 
     public PeanutWindow()
     {
+        // Reverting vertices because they somehow get rendered reversed
+        vertices = vertices.Reverse().ToArray();
         // Create a window.
         var options = WindowOptions.Default;
         options.Size = new Vector2D<int>(800, 600);
