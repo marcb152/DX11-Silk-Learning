@@ -85,6 +85,7 @@ public class PeanutWindow
     private ComPtr<ID3D11VertexShader> vertexShader = default;
     private ComPtr<ID3D11PixelShader> pixelShader = default;
     private ComPtr<ID3D11InputLayout> inputLayout = default;
+    private ComPtr<ID3D11DepthStencilView> DSV = default;
 
     public PeanutWindow()
     {
@@ -118,6 +119,7 @@ public class PeanutWindow
         constantBuffer.Dispose();
         pixelShader.Dispose();
         inputLayout.Dispose();
+        DSV.Dispose();
         compiler.Dispose();
         d3d11.Dispose();
         dxgi.Dispose();
@@ -353,6 +355,51 @@ public class PeanutWindow
             ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pixelShader));
         pixelCode.Dispose();
         pixelErrors.Dispose();
+        
+        // Create depth stencil state
+        DepthStencilDesc depthStencilDesc = new DepthStencilDesc()
+        {
+            DepthEnable = true,
+            DepthWriteMask = DepthWriteMask.All,
+            DepthFunc = ComparisonFunc.Less,
+            StencilEnable = false
+        };
+        ComPtr<ID3D11DepthStencilState> depthStencilState = default;
+        SilkMarshal.ThrowHResult(device.CreateDepthStencilState(in depthStencilDesc, ref depthStencilState));
+        // Bind depth stencil state to the output merger stage
+        deviceContext.OMSetDepthStencilState(depthStencilState, 1u);
+        
+        // Create depth stencil texture buffer
+        ComPtr<ID3D11Texture2D> depthStencilBuffer = default;
+        Texture2DDesc depthStencilBufferDesc = new Texture2DDesc()
+        {
+            Width = (uint) window.FramebufferSize.X,
+            Height = (uint) window.FramebufferSize.Y,
+            MipLevels = 1,
+            ArraySize = 1,
+            Format = Format.FormatD32Float,
+            SampleDesc = new SampleDesc()
+            {
+                Count = 1,
+                Quality = 0
+            },
+            Usage = Usage.Default,
+            BindFlags = (uint)BindFlag.DepthStencil
+        };
+        SilkMarshal.ThrowHResult(device.CreateTexture2D(in depthStencilBufferDesc, null, ref depthStencilBuffer));
+        // Create the depth stencil view texture
+        DepthStencilViewDesc depthStencilViewDesc = new DepthStencilViewDesc()
+        {
+            Format = Format.FormatD32Float,
+            ViewDimension = DsvDimension.Texture2D,
+            Texture2D = new Tex2DDsv()
+            {
+                MipSlice = 0
+            }
+        };
+        SilkMarshal.ThrowHResult(device.CreateDepthStencilView(depthStencilBuffer, in depthStencilViewDesc, ref DSV));
+        // Bind depth stencil view to the output merger stage
+        deviceContext.OMSetRenderTargets(1u, renderTargetView.GetAddressOf(), DSV);
     }
 
 
@@ -401,7 +448,8 @@ public class PeanutWindow
     private unsafe void OnRender(double deltaSeconds)
     {
         BeginFrame(deltaSeconds);
-        Draw(deltaSeconds);
+        Draw(false);
+        Draw(true);
         EndFrame();
     }
 
@@ -414,9 +462,12 @@ public class PeanutWindow
 
         // Clear the render target to be all black ahead of rendering.
         deviceContext.ClearRenderTargetView(renderTargetView, backgroundColor);
+        
+        // Clear the depth buffer to 1.0f and the stencil buffer to 0.
+        deviceContext.ClearDepthStencilView(DSV, (uint)ClearFlag.Depth, 1.0f, 0);
     }
 
-    private unsafe void Draw(double deltaSeconds)
+    private unsafe void Draw(bool move)
     {
         // Registering vertex buffer
         // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
@@ -427,17 +478,17 @@ public class PeanutWindow
             // Stride is the byte-size of a single vertex (3 floats)
             ref vertexBuffer, (uint)sizeof(Vertex), 0u);
         deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR16Uint, 0u);
-        
-        float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
-        float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
-        
+        //
+        // float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
+        // float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
+        //
         // Set up the constant buffer
         constantBufferStruct = new ConstBuffStruct() { transform = 
             Matrix4x4.Transpose(
                 Matrix4x4.CreateScale(0.5f) *
                 Matrix4x4.CreateRotationZ((float)elapsedTime) *
                 Matrix4x4.CreateRotationX((float)elapsedTime) *
-                Matrix4x4.CreateTranslation(cameraPos.Y, 0f, cameraPos.X + 10f) *
+                Matrix4x4.CreateTranslation(cameraPos.Y, 0f, move ? cameraPos.X + 10f : 10f) *
                 Matrix4x4.CreatePerspectiveLeftHanded(1, 3/4f, 0.5f, 100.0f)
             )
         };
@@ -478,7 +529,7 @@ public class PeanutWindow
         };
         deviceContext.RSSetViewports(1u, viewport);
         // Output Merger stage
-        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, ref Unsafe.NullRef<ID3D11DepthStencilView>());
+        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, DSV);
         
         deviceContext.DrawIndexed((uint)indices.Length, 0u, 0);
     }
