@@ -52,7 +52,7 @@ public class PeanutWindow
 
     private struct ConstBuffStruct
     {
-        public Matrix4X4<float> transform;
+        public Matrix4x4 transform;
     }
     
     private ConstBuffStruct constantBufferStruct;
@@ -88,13 +88,13 @@ public class PeanutWindow
 
     public PeanutWindow()
     {
-        // Reverting vertices because they somehow get rendered reversed
-        vertices = vertices.Reverse().ToArray();
         // Create a window.
-        var options = WindowOptions.Default;
-        options.Size = new Vector2D<int>(800, 600);
-        options.Title = "Learn Direct3D11 with Silk.NET";
-        options.API = GraphicsAPI.None; // <-- This bit is important, as your window will be configured for OpenGL by default.
+        var options = WindowOptions.Default with
+        {
+            Size = new Vector2D<int>(800, 600),
+            Title = "Learn Direct3D11 with Silk.NET",
+            API = GraphicsAPI.None, // <-- This bit is important, as your window will be configured for OpenGL by default.
+        };
         window = Window.Create(options);
 
         // Assign events.
@@ -128,7 +128,7 @@ public class PeanutWindow
 
     private unsafe void OnLoad()
     {
-        //Whether or not to force use of DXVK on platforms where native DirectX implementations are available
+        // Whether or not to force use of DXVK on platforms where native DirectX implementations are available
         const bool forceDxvk = false;
 
         dxgi = DXGI.GetApi(window, forceDxvk);
@@ -209,7 +209,7 @@ public class PeanutWindow
             ByteWidth = (uint)(vertices.Length * sizeof(Vertex)),
             MiscFlags = 0u,
             CPUAccessFlags = 0u,
-            StructureByteStride = sizeof(float),
+            StructureByteStride = (uint)sizeof(Vertex),
             BindFlags = (uint)BindFlag.VertexBuffer,
         };
         fixed (Vertex* vertexData = vertices)
@@ -228,7 +228,7 @@ public class PeanutWindow
             ByteWidth = (uint)(indices.Length * sizeof(ushort)),
             MiscFlags = 0u,
             CPUAccessFlags = 0u,
-            StructureByteStride = sizeof(ushort),
+            StructureByteStride = (uint)sizeof(ushort),
             BindFlags = (uint)BindFlag.IndexBuffer,
         };
         fixed (ushort* indexData = indices)
@@ -280,7 +280,8 @@ public class PeanutWindow
         fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
                     color = SilkMarshal.StringToMemory("Color"))
         {
-            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [new InputElementDesc()
+            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [
+                new InputElementDesc()
             {
                 SemanticName = pos,
                 SemanticIndex = 0,
@@ -432,12 +433,12 @@ public class PeanutWindow
         
         // Set up the constant buffer
         constantBufferStruct = new ConstBuffStruct() { transform = 
-            Matrix4X4.Transpose(
-                Matrix4X4.CreateScale(0.5f) *
-                Matrix4X4.CreateRotationZ((float)elapsedTime) *
-                Matrix4X4.CreateRotationX((float)elapsedTime) *
-                Matrix4X4.CreateTranslation(cameraPos.Y, 0f, cameraPos.X - 10f) *
-                Matrix4X4.CreatePerspective(1, 3/4f, 0.5f, 100.0f)
+            Matrix4x4.Transpose(
+                Matrix4x4.CreateScale(0.5f) *
+                Matrix4x4.CreateRotationZ((float)elapsedTime) *
+                Matrix4x4.CreateRotationX((float)elapsedTime) *
+                Matrix4x4.CreateTranslation(cameraPos.Y, 0f, cameraPos.X + 10f) *
+                Matrix4x4.CreatePerspectiveLeftHanded(1, 3/4f, 0.5f, 100.0f)
             )
         };
         // Update the constant buffer
@@ -503,10 +504,10 @@ public class PeanutWindow
         switch (key)
         {
             case Key.W:
-                cameraDir.X = 1;
+                cameraDir.X = -1;
                 break;
             case Key.S:
-                cameraDir.X = -1;
+                cameraDir.X = 1;
                 break;
             case Key.A:
                 cameraDir.Y = 1;
