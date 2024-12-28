@@ -1,15 +1,15 @@
 ﻿using System.Diagnostics;
 using System.Numerics;
-using DX11_Silk.NET_Learning.Bindable;
+using DX11_Silk.NET_Learning.Bindables;
 
-namespace DX11_Silk.NET_Learning;
+namespace DX11_Silk.NET_Learning.Drawables;
 
 public abstract class Drawable
 {
     private List<IBindable> bindables = new List<IBindable>();
     private IndexBuffer? indexBuffer;
     
-    public void Draw(ref PeanutGraphics graphics)
+    public void Draw(PeanutGraphics graphics)
     {
         foreach (var bindable in bindables)
         {
@@ -20,13 +20,13 @@ public abstract class Drawable
         graphics.DrawIndexed(indexBuffer.IndexCount);
     }
     
-    public void AddBind(ref IBindable bind)
+    public void AddBind(IBindable bind)
     {
         Debug.Assert(bind.GetType() != typeof(IndexBuffer), "Must use AddIndexBuffer to bind index buffer");
         bindables.Add(bind);
     }
     
-    public void AddIndexBuffer(ref IndexBuffer buffer)
+    public void AddIndexBuffer(IndexBuffer buffer)
     {
         Debug.Assert(indexBuffer == null, "Attempting to add index buffer a second time");
         indexBuffer = buffer;

@@ -90,8 +90,7 @@ public class PeanutWindow
     private unsafe void OnRender(double deltaSeconds)
     {
         graphics?.BeginFrame(deltaSeconds);
-        graphics?.Draw(false, cameraPos, window!.FramebufferSize);
-        graphics?.Draw(true, cameraPos, window!.FramebufferSize);
+        graphics?.Draw(false, cameraPos, window!.FramebufferSize, deltaSeconds);
         graphics?.EndFrame();
     }
 

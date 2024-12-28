@@ -2,7 +2,7 @@
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 
-namespace DX11_Silk.NET_Learning.Bindable;
+namespace DX11_Silk.NET_Learning.Bindables;
 
 public class IndexBuffer : IBindable
 {

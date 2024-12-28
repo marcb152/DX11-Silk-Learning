@@ -1,4 +1,4 @@
-﻿namespace DX11_Silk.NET_Learning;
+﻿namespace DX11_Silk.NET_Learning.Bindables;
 
 public interface IBindable
 {

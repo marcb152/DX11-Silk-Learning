@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
+using DX11_Silk.NET_Learning.Drawables;
 using DX11_Silk.NET_Learning.Models;
 using Silk.NET.Core.Contexts;
 using Silk.NET.Core.Native;
@@ -13,6 +13,8 @@ namespace DX11_Silk.NET_Learning;
 
 public class PeanutGraphics : IDisposable
 {
+    public Matrix4x4 ProjectionMatrix { get; set; }
+    
     private float[] backgroundColor = [0.0f, 0.0f, 0.0f, 1.0f];
 
     private double elapsedTime = 0.0f;
@@ -70,6 +72,8 @@ public class PeanutGraphics : IDisposable
     private ComPtr<ID3D11PixelShader> pixelShader = default;
     private ComPtr<ID3D11InputLayout> inputLayout = default;
     private ComPtr<ID3D11DepthStencilView> DSV = default;
+
+    private List<CubeBox> boxes = [];
 
     public unsafe PeanutGraphics(INativeWindowSource window, Vector2D<int> FramebufferSize)
     {
@@ -138,157 +142,18 @@ public class PeanutGraphics : IDisposable
         // Create a view over the render target.
         SilkMarshal.ThrowHResult(device.CreateRenderTargetView(backbuffer, null, ref renderTargetView));
         
-        // Creating vertex buffer data
-        BufferDesc bufferDesc = new BufferDesc()
+        for (int i = 0; i < 50; i++)
         {
-            Usage = Usage.Default,
-            ByteWidth = (uint)(vertices.Length * sizeof(Vertex)),
-            MiscFlags = 0u,
-            CPUAccessFlags = 0u,
-            StructureByteStride = (uint)sizeof(Vertex),
-            BindFlags = (uint)BindFlag.VertexBuffer,
-        };
-        fixed (Vertex* vertexData = vertices)
-        {
-            SubresourceData subresourceData = new SubresourceData
-            {
-                PSysMem = vertexData
-            };
-            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref vertexBuffer));
-        }
-        
-        // Creating index buffer data
-        bufferDesc = new BufferDesc()
-        {
-            Usage = Usage.Default,
-            ByteWidth = (uint)(indices.Length * sizeof(ushort)),
-            MiscFlags = 0u,
-            CPUAccessFlags = 0u,
-            StructureByteStride = (uint)sizeof(ushort),
-            BindFlags = (uint)BindFlag.IndexBuffer,
-        };
-        fixed (ushort* indexData = indices)
-        {
-            SubresourceData subresourceData = new SubresourceData
-            {
-                PSysMem = indexData
-            };
-            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref indexBuffer));
-        }
-        
-        // Compiling vertex shader blob
-        string path = Path.Combine(Directory.GetCurrentDirectory(),
-            "Shaders/VertexShader.hlsl");
-        var shaderBytes = Encoding.ASCII.GetBytes(File.ReadAllText(path));
-
-        // Compile vertex shader.
-        ComPtr<ID3D10Blob> vertexCode = default;
-        ComPtr<ID3D10Blob> vertexErrors = default;
-        HResult hr = compiler.Compile
-        (
-            in shaderBytes[0],
-            (nuint) shaderBytes.Length,
-            null as string,
-            null,
-            ref Unsafe.NullRef<ID3DInclude>(),
-            "main",
-            "vs_5_0",
-            0,
-            0,
-            ref vertexCode,
-            ref vertexErrors
-        );
-        // Check for compilation errors.
-        if (hr.IsFailure)
-        {
-            if (vertexErrors.Handle is not null)
-            {
-                Console.WriteLine(SilkMarshal.PtrToString((nint) vertexErrors.GetBufferPointer()));
-            }
-            hr.Throw();
-        }
-        // Register shader
-        SilkMarshal.ThrowHResult(device.CreateVertexShader(
-            vertexCode.GetBufferPointer(), vertexCode.GetBufferSize(),
-            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref vertexShader));
-        
-        // Describe the layout of the input data for the vertex shader.
-        fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
-                    color = SilkMarshal.StringToMemory("Color"))
-        {
-            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [new InputElementDesc()
-            {
-                SemanticName = pos,
-                SemanticIndex = 0,
-                Format = Format.FormatR32G32B32Float,
-                InputSlot = 0,
-                AlignedByteOffset = 0,
-                InputSlotClass = InputClassification.PerVertexData,
-                InstanceDataStepRate = 0
-            },
-            new InputElementDesc()
-            {
-                SemanticName = color,
-                SemanticIndex = 0,
-                Format = Format.FormatB8G8R8A8Unorm,
-                InputSlot = 0,
-                AlignedByteOffset = D3D11.AppendAlignedElement,
-                InputSlotClass = InputClassification.PerVertexData,
-                InstanceDataStepRate = 0
-            },
-            ];
-
-            SilkMarshal.ThrowHResult(
-                device.CreateInputLayout(
-                    vertexStructureDesc,
-                    (uint) vertexStructureDesc.Length,
-                    vertexCode.GetBufferPointer(),
-                    vertexCode.GetBufferSize(),
-                    inputLayout.GetAddressOf()
-                ));
+            boxes.Add(new CubeBox(this, ref compiler,
+                adist: new Vector2(0f, 3.1415f / 2f),
+                ddist: new Vector2(0f, 3.1415f / 2f),
+                odist: new Vector2(0f, 3.1415f / 2f),
+                rdist: new Vector2(6f, 20f)));
         }
 
-        vertexCode.Dispose();
-        vertexErrors.Dispose();
-        
-        // Compiling pixel shader blob
-        path = Path.Combine(Directory.GetCurrentDirectory(),
-            "Shaders/PixelShader.hlsl");
-        shaderBytes = Encoding.ASCII.GetBytes(File.ReadAllText(path));
+        ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(
+            1, 3 / 4f, 0.5f, 100.0f);
 
-        // Compile pixel shader.
-        ComPtr<ID3D10Blob> pixelCode = default;
-        ComPtr<ID3D10Blob> pixelErrors = default;
-        hr = compiler.Compile
-        (
-            in shaderBytes[0],
-            (nuint) shaderBytes.Length,
-            null as string,
-            null,
-            ref Unsafe.NullRef<ID3DInclude>(),
-            "main",
-            "ps_5_0",
-            0,
-            0,
-            ref pixelCode,
-            ref pixelErrors
-        );
-        // Check for compilation errors.
-        if (hr.IsFailure)
-        {
-            if (pixelErrors.Handle is not null)
-            {
-                Console.WriteLine(SilkMarshal.PtrToString((nint) pixelErrors.GetBufferPointer()));
-            }
-            hr.Throw();
-        }
-        // Register shader
-        SilkMarshal.ThrowHResult(device.CreatePixelShader(
-            pixelCode.GetBufferPointer(), pixelCode.GetBufferSize(),
-            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pixelShader));
-        pixelCode.Dispose();
-        pixelErrors.Dispose();
-        
         // Create depth stencil state
         DepthStencilDesc depthStencilDesc = new DepthStencilDesc()
         {
@@ -332,7 +197,19 @@ public class PeanutGraphics : IDisposable
         };
         SilkMarshal.ThrowHResult(device.CreateDepthStencilView(depthStencilBuffer, in depthStencilViewDesc, ref DSV));
         // Bind depth stencil view to the output merger stage
-        deviceContext.OMSetRenderTargets(1u, renderTargetView.GetAddressOf(), DSV);
+        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, DSV);
+        
+        // Rasterizer stage
+        Viewport viewport = new Viewport
+        {
+            TopLeftX = 0,
+            TopLeftY = 0,
+            Width = FramebufferSize.X,
+            Height = FramebufferSize.Y,
+            MinDepth = 0.0f,
+            MaxDepth = 1.0f
+        };
+        deviceContext.RSSetViewports(1u, in viewport);
     }
 
     public unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -378,71 +255,13 @@ public class PeanutGraphics : IDisposable
         deviceContext.ClearDepthStencilView(DSV, (uint)ClearFlag.Depth, 1.0f, 0);
     }
 
-    public unsafe void Draw(bool move, Vector3 cameraPos, Vector2D<int> FramebufferSize)
+    public unsafe void Draw(bool move, Vector3 cameraPos, Vector2D<int> FramebufferSize, double dt)
     {
-        // Registering vertex buffer
-        // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
-        deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglelist);
-        deviceContext.IASetInputLayout(inputLayout);
-        deviceContext.IASetVertexBuffers(
-            0u, 1u,
-            // Stride is the byte-size of a single vertex (3 floats)
-            ref vertexBuffer, (uint)sizeof(Vertex), 0u);
-        deviceContext.IASetIndexBuffer(indexBuffer, Format.FormatR16Uint, 0u);
-        //
-        // float x = mousePos.X / window.FramebufferSize.X * 2.0f - 1.0f;
-        // float y = -mousePos.Y / window.FramebufferSize.Y * 2.0f + 1.0f;
-        //
-        // Set up the constant buffer
-        constantBufferStruct = new ConstBuffStruct() { transform = 
-            Matrix4x4.Transpose(
-                Matrix4x4.CreateScale(0.5f) *
-                Matrix4x4.CreateRotationZ((float)elapsedTime) *
-                Matrix4x4.CreateRotationX((float)elapsedTime) *
-                Matrix4x4.CreateTranslation(cameraPos.Y, 0f, move ? cameraPos.X + 10f : 10f) *
-                Matrix4x4.CreatePerspectiveLeftHanded(1, 3/4f, 0.5f, 100.0f)
-            )
-        };
-        // Update the constant buffer
-        BufferDesc bufferDesc = new BufferDesc()
+        for (int i = 0; i < boxes.Count; i++)
         {
-            Usage = Usage.Dynamic,
-            ByteWidth = (uint) sizeof(ConstBuffStruct),
-            MiscFlags = 0u,
-            CPUAccessFlags = (uint)CpuAccessFlag.Write,
-            StructureByteStride = 0u,
-            BindFlags = (uint)BindFlag.ConstantBuffer,
-        };
-        fixed (void* constBuffer = &constantBufferStruct)
-        {
-            SubresourceData subresourceData = new SubresourceData
-            {
-                PSysMem = constBuffer
-            };
-            SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref constantBuffer));
+            boxes[i].Update(dt);
+            boxes[i].Draw(this);
         }
-        deviceContext.VSSetConstantBuffers(0u, 1u, ref constantBuffer);
-        
-        // Vertex Shader Stage
-        deviceContext.VSSetShader(vertexShader, null, 0u);
-        // Pixel Shader Stage
-        deviceContext.PSSetShader(pixelShader, null, 0u);
-        
-        // Rasterizer stage
-        Viewport viewport = new Viewport
-        {
-            TopLeftX = 0,
-            TopLeftY = 0,
-            Width = FramebufferSize.X,
-            Height = FramebufferSize.Y,
-            MinDepth = 0.0f,
-            MaxDepth = 1.0f
-        };
-        deviceContext.RSSetViewports(1u, in viewport);
-        // Output Merger stage
-        deviceContext.OMSetRenderTargets(1u, ref renderTargetView, DSV);
-        
-        deviceContext.DrawIndexed((uint)indices.Length, 0u, 0);
     }
 
     public unsafe void EndFrame()

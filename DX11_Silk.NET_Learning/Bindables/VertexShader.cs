@@ -4,14 +4,14 @@ using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 
-namespace DX11_Silk.NET_Learning.Bindable;
+namespace DX11_Silk.NET_Learning.Bindables;
 
 public class VertexShader : IBindable
 {
     private ComPtr<ID3D11VertexShader> vertexShader = default;
     protected ComPtr<ID3D10Blob> bytecodeBlob = default;
     
-    public ComPtr<ID3D10Blob> GetBytecodeBlob => bytecodeBlob;
+    public ref ComPtr<ID3D10Blob> GetBytecodeBlob => ref bytecodeBlob;
     
     public unsafe VertexShader(ref PeanutGraphics graphics, ref D3DCompiler compiler, ref string path)
     {
