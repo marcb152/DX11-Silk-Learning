@@ -1,7 +1,6 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 using DX11_Silk.NET_Learning.Drawables;
-using DX11_Silk.NET_Learning.Models;
 using Silk.NET.Core.Contexts;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
@@ -18,28 +17,6 @@ public class PeanutGraphics : IDisposable
     private float[] backgroundColor = [0.0f, 0.0f, 0.0f, 1.0f];
 
     private double elapsedTime = 0.0f;
-
-    private Vertex[] vertices =
-    [
-        new Vertex() { x =  -1.0f, y =  -1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
-        new Vertex() { x =  1.0f, y = -1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
-        new Vertex() { x = -1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
-        new Vertex() { x = 1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
-        new Vertex() { x = -1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
-        new Vertex() { x = 1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
-        new Vertex() { x = -1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
-        new Vertex() { x = 1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
-    ];
-
-    private ushort[] indices =
-    [
-        0,2,1, 2,3,1,
-        1,3,5, 3,7,5,
-        2,6,3, 3,6,7,
-        4,5,7, 4,7,6,
-        0,4,2, 2,4,6,
-        0,1,4, 1,5,4
-    ];
 
     private struct ConstBuffStruct
     {
@@ -65,12 +42,6 @@ public class PeanutGraphics : IDisposable
     public ComPtr<ID3D11DeviceContext> GetContext => deviceContext;
     
     private ComPtr<ID3D11RenderTargetView> renderTargetView = default;
-    private ComPtr<ID3D11Buffer> vertexBuffer = default;
-    private ComPtr<ID3D11Buffer> indexBuffer = default;
-    private ComPtr<ID3D11Buffer> constantBuffer = default;
-    private ComPtr<ID3D11VertexShader> vertexShader = default;
-    private ComPtr<ID3D11PixelShader> pixelShader = default;
-    private ComPtr<ID3D11InputLayout> inputLayout = default;
     private ComPtr<ID3D11DepthStencilView> DSV = default;
 
     private List<CubeBox> boxes = [];
@@ -288,12 +259,6 @@ public class PeanutGraphics : IDisposable
         device.Dispose();
         deviceContext.Dispose();
         renderTargetView.Dispose();
-        vertexBuffer.Dispose();
-        indexBuffer.Dispose();
-        vertexShader.Dispose();
-        constantBuffer.Dispose();
-        pixelShader.Dispose();
-        inputLayout.Dispose();
         DSV.Dispose();
         compiler.Dispose();
         d3d11.Dispose();
