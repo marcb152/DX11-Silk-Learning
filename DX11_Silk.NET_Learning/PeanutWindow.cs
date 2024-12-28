@@ -15,7 +15,6 @@ namespace DX11_Silk.NET_Learning;
 
 public class PeanutWindow
 {
-    
     private Vector2 mousePos = Vector2.Zero;
     
     private Vector2 cameraDir = Vector2.Zero;
@@ -24,7 +23,7 @@ public class PeanutWindow
     
     private IWindow? window;
     
-    private PeanutGraphics graphics;
+    private PeanutGraphics? graphics;
 
     public PeanutWindow()
     {
@@ -57,7 +56,7 @@ public class PeanutWindow
     {
         
         // Set-up input context.
-        var input = window.CreateInput();
+        var input = window!.CreateInput();
         foreach (var keyboard in input.Keyboards)
         {
             keyboard.KeyDown += OnKeyDown;
@@ -66,7 +65,7 @@ public class PeanutWindow
         input.Mice[0].MouseMove += OnMouseMove;
 
         // Create a graphics object.
-        graphics = new PeanutGraphics(window, window.FramebufferSize);
+        graphics = new PeanutGraphics(window!, window!.FramebufferSize);
     }
 
 
@@ -90,7 +89,10 @@ public class PeanutWindow
 
     private unsafe void OnRender(double deltaSeconds)
     {
-        graphics?.OnRender(deltaSeconds, cameraPos, window.FramebufferSize);
+        graphics?.BeginFrame(deltaSeconds);
+        graphics?.Draw(false, cameraPos, window!.FramebufferSize);
+        graphics?.Draw(true, cameraPos, window!.FramebufferSize);
+        graphics?.EndFrame();
     }
 
     private void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
@@ -98,7 +100,7 @@ public class PeanutWindow
         // Check to close the window on escape.
         if (key == Key.Escape)
         {
-            window.Close();
+            window?.Close();
         }
         switch (key)
         {

@@ -45,21 +45,23 @@ public class PeanutGraphics : IDisposable
     }
     
     private ConstBuffStruct constantBufferStruct;
-
     
     // Load the DXGI and Direct3D11 libraries for later use.
     // Given this is not tied to the window, this doesn't need to be done in the OnLoad event.
     private DXGI dxgi = null!;
-
     private D3D11 d3d11 = null!;
     private D3DCompiler compiler = null!;
 
     // These variables are initialized within the Load event.
     private ComPtr<IDXGIFactory2> factory = default;
-
     private ComPtr<IDXGISwapChain1> swapchain = default;
     private ComPtr<ID3D11Device> device = default;
+    public ComPtr<ID3D11Device> GetDevice => device;
+    
     private ComPtr<ID3D11DeviceContext> deviceContext = default;
+    
+    public ComPtr<ID3D11DeviceContext> GetContext => deviceContext;
+    
     private ComPtr<ID3D11RenderTargetView> renderTargetView = default;
     private ComPtr<ID3D11Buffer> vertexBuffer = default;
     private ComPtr<ID3D11Buffer> indexBuffer = default;
@@ -214,8 +216,7 @@ public class PeanutGraphics : IDisposable
         fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
                     color = SilkMarshal.StringToMemory("Color"))
         {
-            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [
-                new InputElementDesc()
+            ReadOnlySpan<InputElementDesc> vertexStructureDesc = [new InputElementDesc()
             {
                 SemanticName = pos,
                 SemanticIndex = 0,
@@ -360,19 +361,10 @@ public class PeanutGraphics : IDisposable
             MinDepth = 0.0f,
             MaxDepth = 1.0f
         };
-        deviceContext.RSSetViewports(1u, viewport);
-    }
-
-    public unsafe void OnRender(double deltaSeconds, Vector3 cameraPos, Vector2D<int> FramebufferSize)
-    {
-        BeginFrame(deltaSeconds);
-        Draw(false, cameraPos, FramebufferSize);
-        Draw(true, cameraPos, FramebufferSize);
-        EndFrame();
+        deviceContext.RSSetViewports(1u, in viewport);
     }
     
-    
-    private unsafe void BeginFrame(double deltaSeconds)
+    public unsafe void BeginFrame(double deltaSeconds)
     {
         elapsedTime += deltaSeconds;
         // float c = MathF.Sin((float)elapsedTime) / 2.0f + 0.5f;
@@ -386,7 +378,7 @@ public class PeanutGraphics : IDisposable
         deviceContext.ClearDepthStencilView(DSV, (uint)ClearFlag.Depth, 1.0f, 0);
     }
 
-    private unsafe void Draw(bool move, Vector3 cameraPos, Vector2D<int> FramebufferSize)
+    public unsafe void Draw(bool move, Vector3 cameraPos, Vector2D<int> FramebufferSize)
     {
         // Registering vertex buffer
         // Update the input assembler to use our shader input layout, and associated vertex & index buffers.
@@ -446,14 +438,14 @@ public class PeanutGraphics : IDisposable
             MinDepth = 0.0f,
             MaxDepth = 1.0f
         };
-        deviceContext.RSSetViewports(1u, viewport);
+        deviceContext.RSSetViewports(1u, in viewport);
         // Output Merger stage
         deviceContext.OMSetRenderTargets(1u, ref renderTargetView, DSV);
         
         deviceContext.DrawIndexed((uint)indices.Length, 0u, 0);
     }
 
-    private unsafe void EndFrame()
+    public unsafe void EndFrame()
     {
         // Presenting the backbuffer to the swapchain.
         HResult hr = swapchain.Present(1u, 0u);
@@ -462,6 +454,11 @@ public class PeanutGraphics : IDisposable
             SilkMarshal.ThrowHResult(hr);
             // TODO: Handle device removed or reset.
         }
+    }
+    
+    public unsafe void DrawIndexed(uint indexCount)
+    {
+        deviceContext.DrawIndexed(indexCount, 0u, 0);
     }
     
     public void Dispose()
