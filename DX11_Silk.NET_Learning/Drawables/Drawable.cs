@@ -4,7 +4,7 @@ using DX11_Silk.NET_Learning.Bindables;
 
 namespace DX11_Silk.NET_Learning.Drawables;
 
-public abstract class Drawable
+public abstract partial class Drawable
 {
     private List<IBindable> bindables = new List<IBindable>();
     private IndexBuffer? indexBuffer;
@@ -15,20 +15,24 @@ public abstract class Drawable
         {
             bindable.Bind(ref graphics);
         }
+        foreach (IBindable staticBind in GetStaticBinds())
+        {
+            staticBind.Bind(ref graphics);
+        }
         if (indexBuffer is null)
             throw new ArgumentNullException($"{indexBuffer} not set in drawable");
         graphics.DrawIndexed(indexBuffer.IndexCount);
     }
     
-    public void AddBind(IBindable bind)
+    protected void AddBind(IBindable bind)
     {
         Debug.Assert(bind.GetType() != typeof(IndexBuffer), "Must use AddIndexBuffer to bind index buffer");
         bindables.Add(bind);
     }
     
-    public void AddIndexBuffer(IndexBuffer buffer)
+    protected void AddIndexBuffer(IndexBuffer buffer)
     {
-        Debug.Assert(indexBuffer == null, "Attempting to add index buffer a second time");
+        Debug.Assert(indexBuffer is null, "Attempting to add index buffer a second time");
         indexBuffer = buffer;
         bindables.Add(buffer);
     }
@@ -36,4 +40,6 @@ public abstract class Drawable
     public abstract void Update(double deltaTime);
     
     public abstract Matrix4x4 GetTransform();
+    
+    protected abstract List<IBindable> GetStaticBinds();
 }

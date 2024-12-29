@@ -8,7 +8,7 @@ using Silk.NET.DXGI;
 
 namespace DX11_Silk.NET_Learning.Drawables;
 
-public class CubeBox : Drawable
+public class CubeBox : Drawable.DrawableBase<CubeBox>
 {
     private float r;
     private float roll = 0f;
@@ -72,52 +72,59 @@ public class CubeBox : Drawable
         theta = RandomRange(random, adist.X, adist.Y);
         phi = RandomRange(random, adist.X, adist.Y);
         chi = RandomRange(random, adist.X, adist.Y);
-        
-        AddBind(new VertexBuffer<Vertex>(ref graphics, ref vertices));
-        
-        string path = Path.Combine(Directory.GetCurrentDirectory(),
-            "Shaders/VertexShader.hlsl");
-        VertexShader vertexShader = new VertexShader(ref graphics, ref compiler, ref path);
-        AddBind(vertexShader);
-        
-        path = Path.Combine(Directory.GetCurrentDirectory(),
-            "Shaders/PixelShader.hlsl");
-        AddBind(new PixelShader(ref graphics, ref compiler, ref path));
-        
-        AddIndexBuffer(new IndexBuffer(ref graphics, ref indices));
-        
-        // Input layout
-        fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
-               color = SilkMarshal.StringToMemory("Color"))
+
+        if (!IsStaticInitialized)
         {
-            ReadOnlySpan<InputElementDesc> vertexStructureDesc =
-            [
-                new InputElementDesc()
-                {
-                    SemanticName = pos,
-                    SemanticIndex = 0,
-                    Format = Format.FormatR32G32B32Float,
-                    InputSlot = 0,
-                    AlignedByteOffset = 0,
-                    InputSlotClass = InputClassification.PerVertexData,
-                    InstanceDataStepRate = 0
-                },
-                new InputElementDesc()
-                {
-                    SemanticName = color,
-                    SemanticIndex = 0,
-                    Format = Format.FormatB8G8R8A8Unorm,
-                    InputSlot = 0,
-                    AlignedByteOffset = D3D11.AppendAlignedElement,
-                    InputSlotClass = InputClassification.PerVertexData,
-                    InstanceDataStepRate = 0
-                },
-            ];
-            AddBind(new InputLayout(ref graphics, ref vertexStructureDesc, ref vertexShader.GetBytecodeBlob));
+            AddStaticBind(new VertexBuffer<Vertex>(ref graphics, ref vertices));
+
+            string path = Path.Combine(Directory.GetCurrentDirectory(),
+                "Shaders/VertexShader.hlsl");
+            VertexShader vertexShader = new VertexShader(ref graphics, ref compiler, ref path);
+            AddStaticBind(vertexShader);
+
+            path = Path.Combine(Directory.GetCurrentDirectory(),
+                "Shaders/PixelShader.hlsl");
+            AddStaticBind(new PixelShader(ref graphics, ref compiler, ref path));
+
+            AddStaticIndexBuffer(new IndexBuffer(ref graphics, ref indices));
+
+            // Input layout
+            fixed (byte* pos = SilkMarshal.StringToMemory("Position"),
+                   color = SilkMarshal.StringToMemory("Color"))
+            {
+                ReadOnlySpan<InputElementDesc> vertexStructureDesc =
+                [
+                    new InputElementDesc()
+                    {
+                        SemanticName = pos,
+                        SemanticIndex = 0,
+                        Format = Format.FormatR32G32B32Float,
+                        InputSlot = 0,
+                        AlignedByteOffset = 0,
+                        InputSlotClass = InputClassification.PerVertexData,
+                        InstanceDataStepRate = 0
+                    },
+                    new InputElementDesc()
+                    {
+                        SemanticName = color,
+                        SemanticIndex = 0,
+                        Format = Format.FormatB8G8R8A8Unorm,
+                        InputSlot = 0,
+                        AlignedByteOffset = D3D11.AppendAlignedElement,
+                        InputSlotClass = InputClassification.PerVertexData,
+                        InstanceDataStepRate = 0
+                    },
+                ];
+                AddStaticBind(new InputLayout(ref graphics, ref vertexStructureDesc, ref vertexShader.GetBytecodeBlob));
+            }
+
+            AddStaticBind(new Topology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist));
+        }
+        else
+        {
+            SetIndexFromStatic();
         }
 
-        AddBind(new Topology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist));
-        
         AddBind(new TransformConstBuff(ref graphics, this));
     }
     
