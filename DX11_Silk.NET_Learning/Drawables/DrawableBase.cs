@@ -8,11 +8,11 @@ public abstract partial class Drawable
 {
     public abstract class DrawableBase<T> : Drawable
     {
-        private List<IBindable> staticBinds = [];
+        private static List<IBindable> staticBinds = [];
 
         protected bool IsStaticInitialized => staticBinds.Count > 0;
 
-        protected void AddStaticBind(IBindable bind)
+        protected static void AddStaticBind(IBindable bind)
         {
             Debug.Assert(bind.GetType() != typeof(IndexBuffer), "Must use AddStaticIndexBuffer to bind index buffer");
             staticBinds.Add(bind);
