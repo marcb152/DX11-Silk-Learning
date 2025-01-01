@@ -4,5 +4,7 @@ SamplerState splr;
 
 float4 main(float2 texCoord : TexCoord) : SV_Target
 {
-    return tex.Sample(splr, texCoord);
+    float2 editedUV = texCoord * 1.0f/16;
+    
+    return tex.Sample(splr, editedUV);
 }

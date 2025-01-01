@@ -25,29 +25,17 @@ public class CubeBox : Drawable.DrawableBase<CubeBox>
     private float dphi;
     private float dchi;
     
-    private Vertex[] vertices =
+    private ColoredVertex[] vertices =
     [
-        new Vertex() { position = new Vector3(-1.0f, -1.0f, -1.0f), color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
-        new Vertex() { position = new Vector3(1.0f, -1.0f, -1.0f), color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
-        new Vertex() { position = new Vector3(-1.0f, 1.0f, -1.0f), color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
-        new Vertex() { position = new Vector3(1.0f, 1.0f, -1.0f), color = new Vertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
-        new Vertex() { position = new Vector3(-1.0f, -1.0f, 1.0f), color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
-        new Vertex() { position = new Vector3(1.0f, -1.0f, 1.0f), color = new Vertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
-        new Vertex() { position = new Vector3(-1.0f, 1.0f, 1.0f), color = new Vertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
-        new Vertex() { position = new Vector3(1.0f, 1.0f, 1.0f), color = new Vertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
+        new ColoredVertex() { position = new Vector3(-1, -1, -1),    color = new ColoredVertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
+        new ColoredVertex() { position = new Vector3(1, -1, -1),     color = new ColoredVertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
+        new ColoredVertex() { position = new Vector3(-1, 1, -1),     color = new ColoredVertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
+        new ColoredVertex() { position = new Vector3(1, 1, -1),      color = new ColoredVertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
+        new ColoredVertex() { position = new Vector3(-1, -1, 1),     color = new ColoredVertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
+        new ColoredVertex() { position = new Vector3(1, -1, 1),      color = new ColoredVertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
+        new ColoredVertex() { position = new Vector3(-1, 1, 1),      color = new ColoredVertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
+        new ColoredVertex() { position = new Vector3(1, 1, 1),       color = new ColoredVertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
     ];
-
-    // private Vector3[] vertices2 =
-    // [
-    //     new Vector3(-1f, -1f, -1f),
-    //     new Vector3(1f, -1f, -1f),
-    //     new Vector3(-1f, 1f, -1f),
-    //     new Vector3(1f, 1f, -1f),
-    //     new Vector3(-1f, -1f, 1f),
-    //     new Vector3(1f, -1f, 1f),
-    //     new Vector3(-1f, 1f, 1f),
-    //     new Vector3(1f, 1f, 1f)
-    // ];
 
     private ushort[] indices =
     [
@@ -75,7 +63,7 @@ public class CubeBox : Drawable.DrawableBase<CubeBox>
 
         if (!IsStaticInitialized)
         {
-            AddStaticBind(new VertexBuffer<Vertex>(ref graphics, ref vertices));
+            AddStaticBind(new VertexBuffer<ColoredVertex>(ref graphics, ref vertices));
 
             string path = Path.Combine(Directory.GetCurrentDirectory(),
                 "Shaders/VertexShader.hlsl");

@@ -44,7 +44,7 @@ public class PeanutGraphics : IDisposable
     private ComPtr<ID3D11RenderTargetView> renderTargetView = default;
     private ComPtr<ID3D11DepthStencilView> DSV = default;
 
-    private List<CubeBox> boxes = [];
+    private List<Drawable> boxes = [];
 
     public unsafe PeanutGraphics(INativeWindowSource window, Vector2D<int> FramebufferSize)
     {
@@ -115,11 +115,18 @@ public class PeanutGraphics : IDisposable
         
         for (int i = 0; i < 50; i++)
         {
-            boxes.Add(new CubeBox(this, ref compiler,
-                adist: new Vector2(0f, 3.1415f / 2f),
-                ddist: new Vector2(0f, 3.1415f / 2f),
-                odist: new Vector2(0f, 3.1415f / 2f),
-                rdist: new Vector2(6f, 20f)));
+            if (i % 2 == 0)
+                boxes.Add(new CubeBox(this, ref compiler,
+                    adist: new Vector2(0f, 3.1415f / 2f),
+                    ddist: new Vector2(0f, 3.1415f / 2f),
+                    odist: new Vector2(0f, 3.1415f / 2f),
+                    rdist: new Vector2(6f, 20f)));
+            else
+                boxes.Add(new RenderedBlock(this, ref compiler,
+                    adist: new Vector2(0f, 3.1415f / 2f),
+                    ddist: new Vector2(0f, 3.1415f / 2f),
+                    odist: new Vector2(0f, 3.1415f / 2f),
+                    rdist: new Vector2(6f, 20f)));
         }
 
         ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(

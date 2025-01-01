@@ -22,17 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Shaders\VertexShader.hlsl">
-      <Generator></Generator>
+    <Content Include="Resources\Textures\*.*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Shaders\PixelShader.hlsl">
+    </Content>
+    <Content Include="Shaders\*.*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <ClCompile Include="Shaders\TexturePS.hlsl" />
-    <ClCompile Include="Shaders\TextureVS.hlsl" />
+    </Content>
   </ItemGroup>
 </Project>
