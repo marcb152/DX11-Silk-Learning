@@ -29,4 +29,5 @@ Quick comparison table of why I chose C#:
  - [C++ DirectX 11 tutorial series - Youtube](https://youtube.com/playlist?list=PLqCJpWy5Fohd3S7ICFXwUomYW0Wv67pDD) by [@ChiliTomatoNoodle](https://www.youtube.com/@ChiliTomatoNoodle)
  - [C++ DirectX 11 tutorial series - Repo](https://github.com/planetchili/hw3d) by [@PlanetChili](https://github.com/planetchili)
  - [Silk.NET DirectX samples](https://github.com/dotnet/Silk.NET/tree/main/examples/CSharp/Direct3D11%20Tutorials)
+ - [First Minecraft clone experiment in C with OpenGL](https://github.com/jdah/minecraft-weekend) by [jdah](https://github.com/jdah)
 
