@@ -21,12 +21,19 @@ public class PeanutWindow
     private Vector3 cameraPos = new Vector3(0, 0, -10);
     private float cameraSpeed = 10f;
     
+    private Dictionary<Key, bool> pressedKeys = new Dictionary<Key, bool>();
+    
     private IWindow? window;
     
     private PeanutGraphics? graphics;
 
     public PeanutWindow()
     {
+        // Init pressed keys dictionary.
+        foreach (Key key in Enum.GetValues(typeof(Key)).Cast<Key>())
+        {
+            pressedKeys[key] = false;
+        }
         // Create a window.
         var options = WindowOptions.Default with
         {
@@ -89,8 +96,9 @@ public class PeanutWindow
 
     private unsafe void OnRender(double deltaSeconds)
     {
-        graphics?.BeginFrame(deltaSeconds);
-        graphics?.Draw(false, cameraPos, window!.FramebufferSize, deltaSeconds);
+        // Time is paused when the space key is pressed.
+        graphics?.BeginFrame(pressedKeys[Key.Space] ? 0f : deltaSeconds);
+        graphics?.Draw(false, cameraPos, window!.FramebufferSize, pressedKeys[Key.Space] ? 0f : deltaSeconds);
         graphics?.EndFrame();
     }
 
@@ -101,6 +109,7 @@ public class PeanutWindow
         {
             window?.Close();
         }
+        pressedKeys[key] = true;
         switch (key)
         {
             case Key.W:
@@ -120,6 +129,7 @@ public class PeanutWindow
     
     private void OnKeyUp(IKeyboard keyboard, Key key, int scancode)
     {
+        pressedKeys[key] = false;
         switch (key)
         {
             case Key.W:

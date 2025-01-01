@@ -27,14 +27,14 @@ public class CubeBox : Drawable.DrawableBase<CubeBox>
     
     private Vertex[] vertices =
     [
-        new Vertex() { x =  -1.0f, y =  -1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
-        new Vertex() { x =  1.0f, y = -1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
-        new Vertex() { x = -1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
-        new Vertex() { x = 1.0f, y = 1.0f, z = -1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
-        new Vertex() { x = -1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
-        new Vertex() { x = 1.0f, y = -1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
-        new Vertex() { x = -1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
-        new Vertex() { x = 1.0f, y = 1.0f, z = 1.0f, color = new Vertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
+        new Vertex() { position = new Vector3(-1.0f, -1.0f, -1.0f), color = new Vertex.Color() { r = 255, g = 0, b = 0, a = 255 }},
+        new Vertex() { position = new Vector3(1.0f, -1.0f, -1.0f), color = new Vertex.Color() { r = 0, g = 255, b = 0, a = 255 }},
+        new Vertex() { position = new Vector3(-1.0f, 1.0f, -1.0f), color = new Vertex.Color() { r = 0, g = 0, b = 255, a = 255 }},
+        new Vertex() { position = new Vector3(1.0f, 1.0f, -1.0f), color = new Vertex.Color() { r = 255, g = 255, b = 0, a = 255 }},
+        new Vertex() { position = new Vector3(-1.0f, -1.0f, 1.0f), color = new Vertex.Color() { r = 255, g = 0, b = 255, a = 255 }},
+        new Vertex() { position = new Vector3(1.0f, -1.0f, 1.0f), color = new Vertex.Color() { r = 0, g = 255, b = 255, a = 255 }},
+        new Vertex() { position = new Vector3(-1.0f, 1.0f, 1.0f), color = new Vertex.Color() { r = 0, g = 0, b = 0, a = 255 }},
+        new Vertex() { position = new Vector3(1.0f, 1.0f, 1.0f), color = new Vertex.Color() { r = 255, g = 255, b = 255, a = 255 }},
     ];
 
     // private Vector3[] vertices2 =

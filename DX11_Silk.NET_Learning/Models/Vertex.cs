@@ -1,10 +1,10 @@
-﻿namespace DX11_Silk.NET_Learning.Models;
+﻿using System.Numerics;
+
+namespace DX11_Silk.NET_Learning.Models;
 
 public struct Vertex
 {
-    public float x;
-    public float y;
-    public float z;
+    public Vector3 position;
     public Color color;
     
     public struct Color
