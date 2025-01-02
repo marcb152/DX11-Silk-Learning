@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.InteropServices;
 using DX11_Silk.NET_Learning.Bindables;
 using DX11_Silk.NET_Learning.Models;
 using Silk.NET.Core.Native;
@@ -29,28 +30,28 @@ public class RenderedBlock : Drawable.DrawableBase<RenderedBlock>
     private TexturedVertex[] vertices =
     [
         // Front face (z = 1)
-        new TexturedVertex { position = new Vector3(0, 0, 1), texCoord = new Vector2(1, 0) },  // Bottom Left
-        new TexturedVertex { position = new Vector3(1, 0, 1), texCoord = new Vector2(0, 0) },  // Bottom Right
-        new TexturedVertex { position = new Vector3(1, 1, 1), texCoord = new Vector2(0, 1) },  // Top Right
-        new TexturedVertex { position = new Vector3(0, 1, 1), texCoord = new Vector2(1, 1) },  // Top Left
+        new TexturedVertex { position = new Vector3(0, 0, 1), texCoord = new Vector2(1, 1) },  // Bottom Left
+        new TexturedVertex { position = new Vector3(1, 0, 1), texCoord = new Vector2(0, 1) },  // Bottom Right
+        new TexturedVertex { position = new Vector3(1, 1, 1), texCoord = new Vector2(0, 0) },  // Top Right
+        new TexturedVertex { position = new Vector3(0, 1, 1), texCoord = new Vector2(1, 0) },  // Top Left
 
         // Back face (z = 0)
-        new TexturedVertex { position = new Vector3(0, 0, 0), texCoord = new Vector2(1, 0) },  // Bottom Left
-        new TexturedVertex { position = new Vector3(1, 0, 0), texCoord = new Vector2(0, 0) },  // Bottom Right
-        new TexturedVertex { position = new Vector3(1, 1, 0), texCoord = new Vector2(0, 1) },  // Top Right
-        new TexturedVertex { position = new Vector3(0, 1, 0), texCoord = new Vector2(1, 1) },  // Top Left
+        new TexturedVertex { position = new Vector3(0, 0, 0), texCoord = new Vector2(1, 1) },  // Bottom Left
+        new TexturedVertex { position = new Vector3(1, 0, 0), texCoord = new Vector2(0, 1) },  // Bottom Right
+        new TexturedVertex { position = new Vector3(1, 1, 0), texCoord = new Vector2(0, 0) },  // Top Right
+        new TexturedVertex { position = new Vector3(0, 1, 0), texCoord = new Vector2(1, 0) },  // Top Left
 
         // Left face (x = 0)
-        new TexturedVertex { position = new Vector3(0, 0, 0), texCoord = new Vector2(1, 0) },  // Bottom Front
-        new TexturedVertex { position = new Vector3(0, 0, 1), texCoord = new Vector2(0, 0) },  // Bottom Back
-        new TexturedVertex { position = new Vector3(0, 1, 1), texCoord = new Vector2(0, 1) },  // Top Back
-        new TexturedVertex { position = new Vector3(0, 1, 0), texCoord = new Vector2(1, 1) },  // Top Front
+        new TexturedVertex { position = new Vector3(0, 0, 0), texCoord = new Vector2(1, 1) },  // Bottom Front
+        new TexturedVertex { position = new Vector3(0, 0, 1), texCoord = new Vector2(0, 1) },  // Bottom Back
+        new TexturedVertex { position = new Vector3(0, 1, 1), texCoord = new Vector2(0, 0) },  // Top Back
+        new TexturedVertex { position = new Vector3(0, 1, 0), texCoord = new Vector2(1, 0) },  // Top Front
 
         // Right face (x = 1)
-        new TexturedVertex { position = new Vector3(1, 0, 0), texCoord = new Vector2(1, 0) },  // Bottom Front
-        new TexturedVertex { position = new Vector3(1, 0, 1), texCoord = new Vector2(0, 0) },  // Bottom Back
-        new TexturedVertex { position = new Vector3(1, 1, 1), texCoord = new Vector2(0, 1) },  // Top Back
-        new TexturedVertex { position = new Vector3(1, 1, 0), texCoord = new Vector2(1, 1) },  // Top Front
+        new TexturedVertex { position = new Vector3(1, 0, 0), texCoord = new Vector2(1, 1) },  // Bottom Front
+        new TexturedVertex { position = new Vector3(1, 0, 1), texCoord = new Vector2(0, 1) },  // Bottom Back
+        new TexturedVertex { position = new Vector3(1, 1, 1), texCoord = new Vector2(0, 0) },  // Top Back
+        new TexturedVertex { position = new Vector3(1, 1, 0), texCoord = new Vector2(1, 0) },  // Top Front
 
         // Top face (y = 1)
         new TexturedVertex { position = new Vector3(0, 1, 0), texCoord = new Vector2(0, 0) },  // Bottom Left
@@ -81,6 +82,23 @@ public class RenderedBlock : Drawable.DrawableBase<RenderedBlock>
         22, 20, 21, 23, 20, 22,
     ];
 
+    [StructLayout(LayoutKind.Explicit, Pack = 16, Size = 16)]
+    struct PixelShaderConstants
+    {
+        [FieldOffset(0)]
+        public uint sides;
+        [FieldOffset(4)]
+        public uint top;
+        [FieldOffset(8)]
+        public uint bottom;
+    }
+
+    private PixelShaderConstants pixelShaderConstants = new()
+    {
+        sides = 1,
+        top = 0,
+        bottom = 2
+    };
     
     public unsafe RenderedBlock(PeanutGraphics graphics, ref D3DCompiler compiler, Vector2 adist, Vector2 ddist, Vector2 odist, Vector2 rdist)
     {
@@ -105,6 +123,8 @@ public class RenderedBlock : Drawable.DrawableBase<RenderedBlock>
             AddStaticBind(new PeanutTexture(ref graphics, ref image));
             
             AddStaticBind(new Sampler(ref graphics));
+            
+            AddStaticBind(new PixelConstantBuffer<PixelShaderConstants>(ref graphics, ref pixelShaderConstants));
             
             string path = Path.Combine(Directory.GetCurrentDirectory(),
                 "Shaders/TextureVS.hlsl");
@@ -170,7 +190,8 @@ public class RenderedBlock : Drawable.DrawableBase<RenderedBlock>
 
     public override Matrix4x4 GetTransform()
     {
-        return Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
+        return Matrix4x4.CreateScale(2f) *
+               Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
                Matrix4x4.CreateTranslation(r, 0f, 0f) *
                Matrix4x4.CreateFromYawPitchRoll(theta, phi, chi) *
                Matrix4x4.CreateTranslation(0f, 0f, 20f);
