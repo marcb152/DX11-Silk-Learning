@@ -58,7 +58,7 @@ public class PeanutWindow
         graphics?.Dispose();
         
         // Dispose of the ImGui context.
-        ImGui.ImGui_ImplWin32_Shutdown();
+        // ImGui.ImGui_ImplWin32_Shutdown();
         ImGui.DestroyContext();
 
         //dispose the window, and its internal resources
@@ -80,7 +80,7 @@ public class PeanutWindow
         ImGui.CreateContext();
         ImGui.StyleColorsDark();
 
-        ImGui.ImGui_ImplWin32_Init(window!.Native!.DXHandle!.Value);
+        // ImGui.ImGui_ImplWin32_Init(window!.Native!.DXHandle!.Value);
         
         // TODO: Add ImGui windows messages handling (aka events).
         // ImGui.ImGui_ImplWin32_WndProcHandler()
@@ -115,7 +115,7 @@ public class PeanutWindow
         graphics?.Draw(false, cameraPos, window!.FramebufferSize, pressedKeys[Key.Space] ? 0f : deltaSeconds);
         
         // ImGui
-        ImGui.ImGui_ImplWin32_NewFrame();
+        // ImGui.ImGui_ImplWin32_NewFrame();
         ImGui_Impl_DX11.ImGui_ImplDX11_NewFrame();
         ImGui.NewFrame();
         

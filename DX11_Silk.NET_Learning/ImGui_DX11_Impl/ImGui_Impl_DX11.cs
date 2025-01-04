@@ -91,9 +91,9 @@ public static class ImGui_Impl_DX11
         ID3D11DeviceContext* device = bd->pd3dDeviceContext;
 
         // Create and grow vertex/index buffers if needed
-        if (bd->pVB == null || bd->VertexBufferSize < draw_data->TotalVtxCount)
+        if (bd->pVB.Handle == null || bd->VertexBufferSize < draw_data->TotalVtxCount)
         {
-            if (bd->pVB != null)
+            if (bd->pVB.Handle != null)
             {
                 bd->pVB.Release();
                 bd->pVB = null;
@@ -110,9 +110,9 @@ public static class ImGui_Impl_DX11
             if (bd->pd3dDevice.CreateBuffer(in desc, null, ref bd->pVB) < 0)
                 return;
         }
-        if (bd->pIB == null || bd->IndexBufferSize < draw_data->TotalIdxCount)
+        if (bd->pIB.Handle == null || bd->IndexBufferSize < draw_data->TotalIdxCount)
         {
-            if (bd->pIB != null)
+            if (bd->pIB.Handle != null)
             {
                 bd->pIB.Release();
                 bd->pIB = null;
@@ -266,7 +266,7 @@ public static class ImGui_Impl_DX11
         // TODO: Handle arrays of PSInstances
         // for (uint i = 0; i < old.PSInstancesCount; i++)
         // {
-            if (old.PSInstances != null) old.PSInstances.Release();
+            if (old.PSInstances.Handle != null) old.PSInstances.Release();
         // }
         device->VSSetShader(old.VS, old.VSInstances, old.VSInstancesCount);
         if (old.VS != null) old.VS->Release();
@@ -276,7 +276,7 @@ public static class ImGui_Impl_DX11
         if (old.GS != null) old.GS->Release();
         // for (uint i = 0; i < old.VSInstancesCount; i++)
         // {
-            if (old.VSInstances != null) old.VSInstances.Release();
+            if (old.VSInstances.Handle != null) old.VSInstances.Release();
         // }
         device->IASetPrimitiveTopology(old.PrimitiveTopology);
         device->IASetIndexBuffer(old.IndexBuffer, old.IndexBufferFormat, old.IndexBufferOffset);
@@ -290,7 +290,7 @@ public static class ImGui_Impl_DX11
     public static unsafe void ImGui_ImplDX11_CreateFontsTexture()
     {
         // Build texture atlas
-        ImGuiIOPtr io = ImGui::GetIO();
+        ImGuiIOPtr io = ImGui.GetIO();
         ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
         io.Fonts.GetTexDataAsRGBA32(out byte* pixels,out int width, out int height);
 
@@ -319,7 +319,7 @@ public static class ImGui_Impl_DX11
             SysMemSlicePitch = 0
         };
         bd->pd3dDevice.CreateTexture2D(in desc, in subResource, ref pTexture);
-        Debug.Assert(pTexture != null);
+        Debug.Assert(pTexture.Handle != null);
 
         // Create texture view
         ShaderResourceViewDesc srvDesc = new ShaderResourceViewDesc
@@ -343,20 +343,20 @@ public static class ImGui_Impl_DX11
     public static unsafe void ImGui_ImplDX11_DestroyFontsTexture()
     {
         ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
-        if (bd->pFontTextureView != null)
+        if (bd->pFontTextureView.Handle != null)
         {
             bd->pFontTextureView.Release();
             bd->pFontTextureView = null;
-            ImGui::GetIO().Fonts.SetTexID(0); // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
+            ImGui.GetIO().Fonts.SetTexID(0); // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
         }
     }
     
     public static unsafe bool ImGui_ImplDX11_CreateDeviceObjects()
     {
         ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
-        if (bd->pd3dDevice == null)
+        if (bd->pd3dDevice.Handle == null)
             return false;
-        if (bd->pFontSampler != null)
+        if (bd->pFontSampler.Handle != null)
             ImGui_ImplDX11_InvalidateDeviceObjects();
 
         // By using D3DCompile() from <d3dcompiler.h> / d3dcompiler.lib, we introduce a dependency to a given version of d3dcompiler_XX.dll (see D3DCOMPILER_DLL_A)
@@ -401,7 +401,7 @@ public static class ImGui_Impl_DX11
         HResult hr = compiler.Compile(
             in shaderBytes[0],
             (nuint) shaderBytes.Length,
-            null as string,
+            nameof(vertexShader),
             null,
             ref Unsafe.NullRef<ID3DInclude>(),
             "main",
@@ -512,7 +512,7 @@ public static class ImGui_Impl_DX11
         hr = compiler.Compile(
             in shaderBytes[0],
             (nuint) shaderBytes.Length,
-            null as string,
+            nameof(pixelShader),
             null,
             ref Unsafe.NullRef<ID3DInclude>(),
             "main",
@@ -614,31 +614,31 @@ public static class ImGui_Impl_DX11
     public static unsafe void ImGui_ImplDX11_InvalidateDeviceObjects()
     {
         ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
-        if (bd->pd3dDevice == null)
+        if (bd->pd3dDevice.Handle == null)
             return;
 
         ImGui_ImplDX11_DestroyFontsTexture();
 
-        if (bd->pFontSampler != null)           { bd->pFontSampler.Release(); bd->pFontSampler = null; }
-        if (bd->pIB != null)                    { bd->pIB.Release(); bd->pIB = null; }
-        if (bd->pVB != null)                    { bd->pVB.Release(); bd->pVB = null; }
-        if (bd->pBlendState != null)            { bd->pBlendState.Release(); bd->pBlendState = null; }
-        if (bd->pDepthStencilState != null)     { bd->pDepthStencilState.Release(); bd->pDepthStencilState = null; }
-        if (bd->pRasterizerState != null)       { bd->pRasterizerState.Release(); bd->pRasterizerState = null; }
-        if (bd->pPixelShader != null)           { bd->pPixelShader.Release(); bd->pPixelShader = null; }
-        if (bd->pVertexConstantBuffer != null)  { bd->pVertexConstantBuffer.Release(); bd->pVertexConstantBuffer = null; }
-        if (bd->pInputLayout != null)           { bd->pInputLayout.Release(); bd->pInputLayout = null; }
-        if (bd->pVertexShader != null)          { bd->pVertexShader.Release(); bd->pVertexShader = null; }
+        if (bd->pFontSampler.Handle != null)           { bd->pFontSampler.Release(); bd->pFontSampler = null; }
+        if (bd->pIB.Handle != null)                    { bd->pIB.Release(); bd->pIB = null; }
+        if (bd->pVB.Handle != null)                    { bd->pVB.Release(); bd->pVB = null; }
+        if (bd->pBlendState.Handle != null)            { bd->pBlendState.Release(); bd->pBlendState = null; }
+        if (bd->pDepthStencilState.Handle != null)     { bd->pDepthStencilState.Release(); bd->pDepthStencilState = null; }
+        if (bd->pRasterizerState.Handle != null)       { bd->pRasterizerState.Release(); bd->pRasterizerState = null; }
+        if (bd->pPixelShader.Handle != null)           { bd->pPixelShader.Release(); bd->pPixelShader = null; }
+        if (bd->pVertexConstantBuffer.Handle != null)  { bd->pVertexConstantBuffer.Release(); bd->pVertexConstantBuffer = null; }
+        if (bd->pInputLayout.Handle != null)           { bd->pInputLayout.Release(); bd->pInputLayout = null; }
+        if (bd->pVertexShader.Handle != null)          { bd->pVertexShader.Release(); bd->pVertexShader = null; }
     }
 
     
     public static unsafe bool ImGui_ImplDX11_Init(ID3D11Device* device, ID3D11DeviceContext* device_context)
     {
-        ImGuiIOPtr io = ImGui::GetIO();
+        ImGuiIOPtr io = ImGui.GetIO();
         
         // TODO: Check version macro
         // IMGUI_CHECKVERSION();
-        Debug.Assert(io.BackendRendererUserData != IntPtr.Zero, "Already initialized a renderer backend!");
+        Debug.Assert(io.BackendRendererUserData == IntPtr.Zero, "Already initialized a renderer backend!");
 
         // Setup backend capabilities flags
         ImGui_ImplDX11_Data bd = new ImGui_ImplDX11_Data();
@@ -671,7 +671,7 @@ public static class ImGui_Impl_DX11
     {
         ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
         Debug.Assert((long)bd is not 0, "No renderer backend to shutdown, or already shutdown?");
-        ImGuiIOPtr io = ImGui::GetIO();
+        ImGuiIOPtr io = ImGui.GetIO();
 
         ImGui_ImplDX11_InvalidateDeviceObjects();
         bd->pFactory.Release();
@@ -691,7 +691,7 @@ public static class ImGui_Impl_DX11
         Debug.Assert((long)bd != IntPtr.Zero, "Context or backend not initialized! Did you call ImGui_ImplDX11_Init()?");
 
         // TODO: Check if condition
-        if (bd->pFontSampler == null)
+        if (bd->pFontSampler.Handle == null)
             ImGui_ImplDX11_CreateDeviceObjects();
     }
     
