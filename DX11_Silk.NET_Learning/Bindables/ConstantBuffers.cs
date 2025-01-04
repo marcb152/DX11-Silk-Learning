@@ -6,7 +6,7 @@ using Silk.NET.Direct3D11;
 
 namespace DX11_Silk.NET_Learning.Bindables;
 
-public abstract class ConstantBuffers<T> : IBindable
+public abstract class ConstantBuffers<T> : IBindable where T : unmanaged
 {
     protected ComPtr<ID3D11Buffer> constantBuffer = default;
 
@@ -55,14 +55,14 @@ public abstract class ConstantBuffers<T> : IBindable
     {
         MappedSubresource mappedResource = default;
         graphics.GetContext.Map(constantBuffer, 0u, Map.WriteDiscard, 0u, ref mappedResource);
-        Unsafe.CopyBlock(mappedResource.PData, Unsafe.AsPointer(ref data), (uint)Marshal.SizeOf<T>(data));
+        Unsafe.CopyBlock(mappedResource.PData, Unsafe.AsPointer(ref data), (uint)sizeof(T));
         graphics.GetContext.Unmap(constantBuffer, 0u);
     }
 
     public abstract void Bind(ref PeanutGraphics graphics);
 }
 
-public class VertexConstantBuffer<T> : ConstantBuffers<T>
+public class VertexConstantBuffer<T> : ConstantBuffers<T> where T : unmanaged
 {
     public VertexConstantBuffer(ref PeanutGraphics graphics, ref T constants) : base(ref graphics, ref constants)
     {
@@ -78,7 +78,7 @@ public class VertexConstantBuffer<T> : ConstantBuffers<T>
     }
 }
 
-public class PixelConstantBuffer<T> : ConstantBuffers<T>
+public class PixelConstantBuffer<T> : ConstantBuffers<T> where T : unmanaged
 {
     public PixelConstantBuffer(ref PeanutGraphics graphics, ref T constants) : base(ref graphics, ref constants)
     {

@@ -7,6 +7,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using System.Numerics;
+using DX11_Silk.NET_Learning.ImGui_DX11_Impl;
+using ImGuiNET;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
@@ -48,12 +50,16 @@ public class PeanutWindow
         window.Update += OnUpdate;
         window.Render += OnRender;
         window.FramebufferResize += OnFramebufferResize;
-
+        
         // Run the window.
         window.Run();
 
         // Dispose of the graphics object.
         graphics?.Dispose();
+        
+        // Dispose of the ImGui context.
+        ImGui.ImGui_ImplWin32_Shutdown();
+        ImGui.DestroyContext();
 
         //dispose the window, and its internal resources
         window.Dispose();
@@ -61,7 +67,6 @@ public class PeanutWindow
 
     private unsafe void OnLoad()
     {
-        
         // Set-up input context.
         var input = window!.CreateInput();
         foreach (var keyboard in input.Keyboards)
@@ -70,7 +75,16 @@ public class PeanutWindow
             keyboard.KeyUp += OnKeyUp;
         }
         input.Mice[0].MouseMove += OnMouseMove;
+        
+        // Init ImGui.
+        ImGui.CreateContext();
+        ImGui.StyleColorsDark();
 
+        ImGui.ImGui_ImplWin32_Init(window!.Native!.DXHandle!.Value);
+        
+        // TODO: Add ImGui windows messages handling (aka events).
+        // ImGui.ImGui_ImplWin32_WndProcHandler()
+        
         // Create a graphics object.
         graphics = new PeanutGraphics(window!, window!.FramebufferSize);
     }
@@ -99,6 +113,20 @@ public class PeanutWindow
         // Time is paused when the space key is pressed.
         graphics?.BeginFrame(pressedKeys[Key.Space] ? 0f : deltaSeconds);
         graphics?.Draw(false, cameraPos, window!.FramebufferSize, pressedKeys[Key.Space] ? 0f : deltaSeconds);
+        
+        // ImGui
+        ImGui.ImGui_ImplWin32_NewFrame();
+        ImGui_Impl_DX11.ImGui_ImplDX11_NewFrame();
+        ImGui.NewFrame();
+        
+        bool showDemoWindow = true;
+        if (showDemoWindow)
+        {
+            ImGui.ShowDemoWindow(ref showDemoWindow);
+        }
+        ImGui.Render();
+        ImGui_Impl_DX11.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
+        
         graphics?.EndFrame();
     }
 

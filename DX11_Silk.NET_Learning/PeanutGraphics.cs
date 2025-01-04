@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 using DX11_Silk.NET_Learning.Drawables;
+using DX11_Silk.NET_Learning.ImGui_DX11_Impl;
 using Silk.NET.Core.Contexts;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
@@ -14,7 +15,7 @@ public class PeanutGraphics : IDisposable
 {
     public Matrix4x4 ProjectionMatrix { get; set; }
     
-    private float[] backgroundColor = [0.0f, 0.0f, 0.0f, 1.0f];
+    private float[] backgroundColor = [0.2f, 0.2f, 0.2f, 1.0f];
 
     private double elapsedTime = 0.0f;
 
@@ -130,7 +131,7 @@ public class PeanutGraphics : IDisposable
         }
 
         ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(
-            1, 3 / 4f, 0.5f, 100.0f);
+            1, FramebufferSize.Y / (float)FramebufferSize.X, 0.5f, 100.0f);
 
         // Create depth stencil state
         DepthStencilDesc depthStencilDesc = new DepthStencilDesc()
@@ -188,6 +189,9 @@ public class PeanutGraphics : IDisposable
             MaxDepth = 1.0f
         };
         deviceContext.RSSetViewports(1u, in viewport);
+        
+        // Init ImGui.
+        ImGui_Impl_DX11.ImGui_ImplDX11_Init(device, deviceContext);
     }
 
     public unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -217,6 +221,10 @@ public class PeanutGraphics : IDisposable
             MaxDepth = 1.0f
         };
         deviceContext.RSSetViewports(1u, in viewport);
+        
+        ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(
+            1, newSize.Y / (float)newSize.X, 0.5f, 100.0f);
+
     }
     
     public unsafe void BeginFrame(double deltaSeconds)
@@ -260,6 +268,8 @@ public class PeanutGraphics : IDisposable
     
     public void Dispose()
     {
+        // Dispose of ImGui.
+        ImGui_Impl_DX11.ImGui_ImplDX11_Shutdown();
         // Clean up any resources.
         factory.Dispose();
         swapchain.Dispose();
