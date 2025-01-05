@@ -13,6 +13,7 @@ namespace DX11_Silk.NET_Learning;
 
 public class PeanutGraphics : IDisposable
 {
+    private readonly ImGui_Impl_DX11 _instance;
     public Matrix4x4 ProjectionMatrix { get; set; }
     
     private float[] backgroundColor = [0.2f, 0.2f, 0.2f, 1.0f];
@@ -47,8 +48,9 @@ public class PeanutGraphics : IDisposable
 
     private List<Drawable> boxes = [];
 
-    public unsafe PeanutGraphics(INativeWindowSource window, Vector2D<int> FramebufferSize)
+    public unsafe PeanutGraphics(INativeWindowSource window, Vector2D<int> FramebufferSize, ref ImGui_Impl_DX11 instance)
     {
+        _instance = instance;
         // Whether or not to force use of DXVK on platforms where native DirectX implementations are available
         const bool forceDxvk = false;
 
@@ -191,7 +193,7 @@ public class PeanutGraphics : IDisposable
         deviceContext.RSSetViewports(1u, in viewport);
         
         // Init ImGui.
-        ImGui_Impl_DX11.ImGui_ImplDX11_Init(device, deviceContext);
+        instance.ImGui_ImplDX11_Init(device, deviceContext);
     }
 
     public unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -269,7 +271,7 @@ public class PeanutGraphics : IDisposable
     public void Dispose()
     {
         // Dispose of ImGui.
-        ImGui_Impl_DX11.ImGui_ImplDX11_Shutdown();
+        _instance.ImGui_ImplDX11_Shutdown();
         // Clean up any resources.
         factory.Dispose();
         swapchain.Dispose();

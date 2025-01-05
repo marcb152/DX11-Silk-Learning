@@ -29,6 +29,8 @@ public class PeanutWindow
     
     private PeanutGraphics? graphics;
 
+    private ImGui_Impl_DX11 instance;
+
     public PeanutWindow()
     {
         // Init pressed keys dictionary.
@@ -44,6 +46,9 @@ public class PeanutWindow
             API = GraphicsAPI.None, // <-- This bit is important, as your window will be configured for OpenGL by default.
         };
         window = Window.Create(options);
+        
+        ImGuiDX11Controller controller = null;
+        instance = new ImGui_Impl_DX11();
 
         // Assign events.
         window.Load += OnLoad;
@@ -68,7 +73,7 @@ public class PeanutWindow
     private unsafe void OnLoad()
     {
         // Set-up input context.
-        var input = window!.CreateInput();
+        IInputContext input = window!.CreateInput();
         foreach (var keyboard in input.Keyboards)
         {
             keyboard.KeyDown += OnKeyDown;
@@ -90,7 +95,7 @@ public class PeanutWindow
         ImGui.GetIO().ConfigDebugIsDebuggerPresent = true;
         
         // Create a graphics object.
-        graphics = new PeanutGraphics(window!, window!.FramebufferSize);
+        graphics = new PeanutGraphics(window!, window!.FramebufferSize, ref instance);
     }
 
 
@@ -120,7 +125,11 @@ public class PeanutWindow
         
         // ImGui
         // ImGui.ImGui_ImplWin32_NewFrame();
-        ImGui_Impl_DX11.ImGui_ImplDX11_NewFrame();
+        ImGuiIOPtr io = ImGui.GetIO();
+        io.DisplaySize = new Vector2(window!.FramebufferSize.X, window!.FramebufferSize.Y);
+        io.DisplayFramebufferScale = new Vector2(1, 1);
+        io.DeltaTime = (float)deltaSeconds;
+        instance.ImGui_ImplDX11_NewFrame();
         ImGui.NewFrame();
         
         bool showDemoWindow = true;
@@ -129,7 +138,7 @@ public class PeanutWindow
             ImGui.ShowDemoWindow(ref showDemoWindow);
         }
         ImGui.Render();
-        ImGui_Impl_DX11.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
+        instance.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
         
         graphics?.EndFrame();
     }
