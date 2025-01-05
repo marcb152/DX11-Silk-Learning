@@ -81,9 +81,13 @@ public class PeanutWindow
         ImGui.StyleColorsDark();
 
         // ImGui.ImGui_ImplWin32_Init(window!.Native!.DXHandle!.Value);
+        ImGuiViewportPtr mainVP = ImGui.GetMainViewport();
+        mainVP.PlatformHandle = window!.Native!.DXHandle!.Value;
+        mainVP.PlatformHandleRaw = window!.Native!.DXHandle!.Value;
         
         // TODO: Add ImGui windows messages handling (aka events).
         // ImGui.ImGui_ImplWin32_WndProcHandler()
+        ImGui.GetIO().ConfigDebugIsDebuggerPresent = true;
         
         // Create a graphics object.
         graphics = new PeanutGraphics(window!, window!.FramebufferSize);
