@@ -47,7 +47,7 @@ public class PeanutWindow
         };
         window = Window.Create(options);
         
-        ImGuiDX11Controller controller = null;
+        // ImGuiDX11Controller controller = null;
         instance = new ImGui_Impl_DX11();
 
         // Assign events.
@@ -129,6 +129,7 @@ public class PeanutWindow
         io.DisplaySize = new Vector2(window!.FramebufferSize.X, window!.FramebufferSize.Y);
         io.DisplayFramebufferScale = new Vector2(1, 1);
         io.DeltaTime = (float)deltaSeconds;
+        io.Fonts.AddFontDefault();
         instance.ImGui_ImplDX11_NewFrame();
         ImGui.NewFrame();
         

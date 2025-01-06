@@ -9,12 +9,6 @@ using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 using Silk.NET.Maths;
-using BlendOp = Silk.NET.Direct3D11.BlendOp;
-using Filter = Silk.NET.Direct3D11.Filter;
-using Format = Silk.NET.DXGI.Format;
-using ImGui = ImGuiNET.ImGui;
-using StencilOp = Silk.NET.Direct3D11.StencilOp;
-using Viewport = Silk.NET.Direct3D11.Viewport;
 
 namespace DX11_Silk.NET_Learning.ImGui_DX11_Impl;
 
@@ -79,7 +73,7 @@ public class ImGui_Impl_DX11
         device_ctx->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
 
         // Setup blend state
-        float[] blend_factor = [0f, 0f, 0f, 0f ];
+        float[] blend_factor = [0f, 0f, 0f, 0f];
         fixed (float* blend_factor_ptr = blend_factor)
         {
             device_ctx->OMSetBlendState(pBlendState, blend_factor_ptr, 0xffffffff);
@@ -98,7 +92,7 @@ public class ImGui_Impl_DX11
         ID3D11DeviceContext* deviceCtx = pd3dDeviceContext;
 
         // Create and grow vertex/index buffers if needed
-        if (pVB.Handle == null || VertexBufferSize < draw_data.TotalVtxCount)
+        if ((long)pVB.Handle == IntPtr.Zero || VertexBufferSize < draw_data.TotalVtxCount)
         {
             if (pVB.Handle != null)
             {
@@ -116,7 +110,7 @@ public class ImGui_Impl_DX11
             };
             SilkMarshal.ThrowHResult(pd3dDevice.CreateBuffer(in desc, null, ref pVB));
         }
-        if (pIB.Handle == null || IndexBufferSize < draw_data.TotalIdxCount)
+        if ((long)pIB.Handle == IntPtr.Zero || IndexBufferSize < draw_data.TotalIdxCount)
         {
             if (pIB.Handle != null)
             {
@@ -172,9 +166,9 @@ public class ImGui_Impl_DX11
 
         BACKUP_DX11_STATE old = new BACKUP_DX11_STATE();
         old.ScissorRectsCount = old.ViewportsCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        // TODO: Solve issue when there are several viewports returned
         deviceCtx->RSGetScissorRects(ref old.ScissorRectsCount, ref old.ScissorRects);
-        deviceCtx->RSGetViewports(ref old.ViewportsCount, ref old.Viewports);
+        // TODO: Solve issue when there are several viewports returned
+        // deviceCtx->RSGetViewports(ref old.ViewportsCount, ref old.Viewports);
         deviceCtx->RSGetState(ref old.RS);
         // TODO: BlendFactor is a float array, but BlendFactor is a float
         deviceCtx->OMGetBlendState(ref old.BlendState, ref old.BlendFactor, ref old.SampleMask);
@@ -186,7 +180,7 @@ public class ImGui_Impl_DX11
         deviceCtx->VSGetShader(ref old.VS, ref old.VSInstances, ref old.VSInstancesCount);
         deviceCtx->VSGetConstantBuffers(0, 1, ref old.VSConstantBuffer);
         deviceCtx->GSGetShader(ref old.GS, ref old.GSInstances, ref old.GSInstancesCount);
-
+        
         deviceCtx->IAGetPrimitiveTopology(ref old.PrimitiveTopology);
         deviceCtx->IAGetIndexBuffer(ref old.IndexBuffer, ref old.IndexBufferFormat, ref old.IndexBufferOffset);
         deviceCtx->IAGetVertexBuffers(0, 1, ref old.VertexBuffer, ref old.VertexBufferStride, ref old.VertexBufferOffset);
@@ -238,8 +232,8 @@ public class ImGui_Impl_DX11
                     deviceCtx->RSSetScissorRects(1, in r);
 
                     // Bind texture, Draw
-                    ID3D11ShaderResourceView* texture_srv = (ID3D11ShaderResourceView*)pcmd.TextureId;
-                    deviceCtx->PSSetShaderResources(0, 1, in texture_srv);
+                    // ID3D11ShaderResourceView* texture_srv = (ID3D11ShaderResourceView*)pcmd.TextureId;
+                    // deviceCtx->PSSetShaderResources(0, 1, &texture_srv);
                     deviceCtx->DrawIndexed(pcmd.ElemCount, (uint)(pcmd.IdxOffset + global_idx_offset), (int)(pcmd.VtxOffset + global_vtx_offset));
                 }
             }
@@ -251,7 +245,8 @@ public class ImGui_Impl_DX11
 
         // Restore modified DX state
         deviceCtx->RSSetScissorRects(old.ScissorRectsCount, old.ScissorRects);
-        deviceCtx->RSSetViewports(old.ViewportsCount, old.Viewports);
+        // TODO: Solve viewports issue
+        //deviceCtx->RSSetViewports(old.ViewportsCount, old.Viewports);
         deviceCtx->RSSetState(old.RS);
         if (old.RS != null) old.RS->Release();
         deviceCtx->OMSetBlendState(old.BlendState, ref old.BlendFactor, old.SampleMask);
@@ -336,7 +331,9 @@ public class ImGui_Impl_DX11
         pTexture.Release();
 
         // Store our identifier
-        io.Fonts.SetTexID((IntPtr)Unsafe.AsPointer(ref pFontTextureView));
+        io.Fonts.SetTexID((IntPtr)pFontTextureView.Handle);
+        // Not sure where to put it, removed it from cmd buffers
+        pd3dDeviceContext.PSSetShaderResources(0, 1, ref pFontTextureView);
     }
     
     
@@ -640,7 +637,7 @@ public class ImGui_Impl_DX11
         
         // TODO: Check version macro
         // IMGUI_CHECKVERSION();
-        Debug.Assert(io.BackendRendererUserData == IntPtr.Zero, "Already initialized a renderer backend!");
+        // Debug.Assert(io.BackendRendererUserData == IntPtr.Zero, "Already initialized a renderer backend!");
 
         // Setup backend capabilities flags
         // Do not use BackendRendererUserData it messed my pointers randomly
@@ -657,7 +654,7 @@ public class ImGui_Impl_DX11
                 {
                     pd3dDevice = device;
                     pd3dDeviceContext = device_context;
-                    pFactory = pFactory;
+                    this.pFactory = pFactory;
                 }
         pDXGIDevice.Release();
         pDXGIAdapter.Release();
