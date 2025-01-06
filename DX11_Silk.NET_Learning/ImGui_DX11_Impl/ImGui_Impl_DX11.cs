@@ -3,14 +3,12 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using DX11_Silk.NET_Learning.Bindables;
 using ImGuiNET;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 using Silk.NET.Maths;
-using Silk.NET.Vulkan;
 using BlendOp = Silk.NET.Direct3D11.BlendOp;
 using Filter = Silk.NET.Direct3D11.Filter;
 using Format = Silk.NET.DXGI.Format;
@@ -24,8 +22,24 @@ public class ImGui_Impl_DX11
 {
     public static uint D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE = 16u;
 
-    private ImGui_ImplDX11_Data bd;
-
+    // DirectX11 data
+    private ComPtr<ID3D11Device>               pd3dDevice =          default;
+    private ComPtr<ID3D11DeviceContext>        pd3dDeviceContext =   default;
+    private ComPtr<IDXGIFactory>               pFactory =            default;
+    private ComPtr<ID3D11Buffer>               pVB =                 default;
+    private ComPtr<ID3D11Buffer>               pIB =                 default;
+    private ComPtr<ID3D11VertexShader>         pVertexShader =       default;
+    private ComPtr<ID3D11InputLayout>          pInputLayout =        default;
+    private ComPtr<ID3D11Buffer>               pVertexConstantBuffer=default;
+    private ComPtr<ID3D11PixelShader>          pPixelShader =        default;    
+    private ComPtr<ID3D11SamplerState>         pFontSampler =        default;
+    private ComPtr<ID3D11ShaderResourceView>   pFontTextureView =    default;
+    private ComPtr<ID3D11RasterizerState>      pRasterizerState =    default;
+    private ComPtr<ID3D11BlendState>           pBlendState =         default;
+    private ComPtr<ID3D11DepthStencilState>    pDepthStencilState =  default;
+    private int                         VertexBufferSize = 5_000;
+    private int                         IndexBufferSize = 10_000;
+    
     // Do not use BackendRendererUserData, it messed up my pointers randomly
     
     #region Functions
@@ -47,18 +61,18 @@ public class ImGui_Impl_DX11
         uint stride = (uint)sizeof(ImDrawVert);
         uint offset = 0;
         
-        device_ctx->IASetInputLayout(bd.pInputLayout);
-        device_ctx->IASetVertexBuffers(0, 1, ref bd.pVB, in stride, in offset);
+        device_ctx->IASetInputLayout(pInputLayout);
+        device_ctx->IASetVertexBuffers(0, 1, ref pVB, in stride, in offset);
         // TODO: Warning there, ImDrawIdx is not defined by ImGui.NET, and uses R16_UINT by default (16-bit indices)
         // Using R32_UINT would require recompiling cimgui with the correct define
         // See https://github.com/ImGuiNET/ImGui.NET/issues/248
         // Original code: https://github.com/ocornut/imgui/blob/master/imgui.h#L260
-        device_ctx->IASetIndexBuffer(bd.pIB, Format.FormatR16Uint, 0);
+        device_ctx->IASetIndexBuffer(pIB, Format.FormatR16Uint, 0);
         device_ctx->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
-        device_ctx->VSSetShader(bd.pVertexShader, null, 0);
-        device_ctx->VSSetConstantBuffers(0, 1, ref bd.pVertexConstantBuffer);
-        device_ctx->PSSetShader(bd.pPixelShader, null, 0);
-        device_ctx->PSSetSamplers(0, 1, ref bd.pFontSampler);
+        device_ctx->VSSetShader(pVertexShader, null, 0);
+        device_ctx->VSSetConstantBuffers(0, 1, ref pVertexConstantBuffer);
+        device_ctx->PSSetShader(pPixelShader, null, 0);
+        device_ctx->PSSetSamplers(0, 1, ref pFontSampler);
         device_ctx->GSSetShader(null, null, 0);
         device_ctx->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
         device_ctx->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
@@ -68,10 +82,10 @@ public class ImGui_Impl_DX11
         float[] blend_factor = [0f, 0f, 0f, 0f ];
         fixed (float* blend_factor_ptr = blend_factor)
         {
-            device_ctx->OMSetBlendState(bd.pBlendState, blend_factor_ptr, 0xffffffff);
+            device_ctx->OMSetBlendState(pBlendState, blend_factor_ptr, 0xffffffff);
         }
-        device_ctx->OMSetDepthStencilState(bd.pDepthStencilState, 0);
-        device_ctx->RSSetState(bd.pRasterizerState);
+        device_ctx->OMSetDepthStencilState(pDepthStencilState, 0);
+        device_ctx->RSSetState(pRasterizerState);
     }
     
     // Render function
@@ -81,50 +95,50 @@ public class ImGui_Impl_DX11
         if (draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f)
             return;
 
-        ID3D11DeviceContext* deviceCtx = bd.pd3dDeviceContext;
+        ID3D11DeviceContext* deviceCtx = pd3dDeviceContext;
 
         // Create and grow vertex/index buffers if needed
-        if (bd.pVB.Handle == null || bd.VertexBufferSize < draw_data.TotalVtxCount)
+        if (pVB.Handle == null || VertexBufferSize < draw_data.TotalVtxCount)
         {
-            if (bd.pVB.Handle != null)
+            if (pVB.Handle != null)
             {
-                bd.pVB.Release();
-                bd.pVB = null;
+                pVB.Release();
+                pVB = null;
             }
-            bd.VertexBufferSize = draw_data.TotalVtxCount + 5000;
+            VertexBufferSize = draw_data.TotalVtxCount + 5000;
             BufferDesc desc = new BufferDesc
             {
                 Usage = Usage.Dynamic,
-                ByteWidth = (uint)(bd.VertexBufferSize * sizeof(ImDrawVert)),
+                ByteWidth = (uint)(VertexBufferSize * sizeof(ImDrawVert)),
                 BindFlags = (uint)BindFlag.VertexBuffer,
                 CPUAccessFlags = (uint)CpuAccessFlag.Write,
                 MiscFlags = 0
             };
-            SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateBuffer(in desc, null, ref bd.pVB));
+            SilkMarshal.ThrowHResult(pd3dDevice.CreateBuffer(in desc, null, ref pVB));
         }
-        if (bd.pIB.Handle == null || bd.IndexBufferSize < draw_data.TotalIdxCount)
+        if (pIB.Handle == null || IndexBufferSize < draw_data.TotalIdxCount)
         {
-            if (bd.pIB.Handle != null)
+            if (pIB.Handle != null)
             {
-                bd.pIB.Release();
-                bd.pIB = null;
+                pIB.Release();
+                pIB = null;
             }
-            bd.IndexBufferSize = draw_data.TotalIdxCount + 10000;
+            IndexBufferSize = draw_data.TotalIdxCount + 10000;
             BufferDesc desc = new BufferDesc
             {
                 Usage = Usage.Dynamic,
-                ByteWidth = (uint)(bd.IndexBufferSize * sizeof(ushort)),
+                ByteWidth = (uint)(IndexBufferSize * sizeof(ushort)),
                 BindFlags = (uint)BindFlag.IndexBuffer,
                 CPUAccessFlags = (uint)CpuAccessFlag.Write
             };
-            SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateBuffer(in desc, null, ref bd.pIB));
+            SilkMarshal.ThrowHResult(pd3dDevice.CreateBuffer(in desc, null, ref pIB));
         }
 
         // Upload vertex/index data into a single contiguous GPU buffer
         MappedSubresource vtx_resource = default;
         MappedSubresource idx_resource = default;
-        SilkMarshal.ThrowHResult(deviceCtx->Map(bd.pVB, 0, Map.WriteDiscard, 0, ref vtx_resource));
-        SilkMarshal.ThrowHResult(deviceCtx->Map(bd.pIB, 0, Map.WriteDiscard, 0, ref idx_resource));
+        SilkMarshal.ThrowHResult(deviceCtx->Map(pVB, 0, Map.WriteDiscard, 0, ref vtx_resource));
+        SilkMarshal.ThrowHResult(deviceCtx->Map(pIB, 0, Map.WriteDiscard, 0, ref idx_resource));
         ImDrawVert* vtx_dst = (ImDrawVert*)vtx_resource.PData;
         ushort* idx_dst = (ushort*)idx_resource.PData;
         for (int n = 0; n < draw_data.CmdListsCount; n++)
@@ -135,13 +149,13 @@ public class ImGui_Impl_DX11
             vtx_dst += draw_list.VtxBuffer.Size;
             idx_dst += draw_list.IdxBuffer.Size;
         }
-        deviceCtx->Unmap(bd.pVB, 0);
-        deviceCtx->Unmap(bd.pIB, 0);
+        deviceCtx->Unmap(pVB, 0);
+        deviceCtx->Unmap(pIB, 0);
 
         // Setup orthographic projection matrix into our constant buffer
         // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
         MappedSubresource mapped_resource = default;
-        SilkMarshal.ThrowHResult(deviceCtx->Map(bd.pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mapped_resource));
+        SilkMarshal.ThrowHResult(deviceCtx->Map(pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mapped_resource));
         VERTEX_CONSTANT_BUFFER_DX11* constant_buffer = (VERTEX_CONSTANT_BUFFER_DX11*)mapped_resource.PData;
         float L = draw_data.DisplayPos.X;
         float R = draw_data.DisplayPos.X + draw_data.DisplaySize.X;
@@ -154,7 +168,7 @@ public class ImGui_Impl_DX11
             (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f
         );
         Unsafe.CopyBlock(Unsafe.AsPointer(ref constant_buffer->mvp), Unsafe.AsPointer(ref mvp), (uint)sizeof(Matrix4X4<float>));
-        deviceCtx->Unmap(bd.pVertexConstantBuffer, 0);
+        deviceCtx->Unmap(pVertexConstantBuffer, 0);
 
         BACKUP_DX11_STATE old = new BACKUP_DX11_STATE();
         old.ScissorRectsCount = old.ViewportsCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
@@ -184,9 +198,9 @@ public class ImGui_Impl_DX11
         // Setup render state structure (for callbacks and custom texture bindings)
         // ImGuiPlatformIOPtr platform_io = ImGui::GetPlatformIO();
         // ImGui_ImplDX11_RenderState render_state;
-        // render_state.Device = bd.pd3dDevice;
-        // render_state.DeviceContext = bd.pd3dDeviceContext;
-        // render_state.SamplerDefault = bd.pFontSampler;
+        // render_state.Device = pd3dDevice;
+        // render_state.DeviceContext = pd3dDeviceContext;
+        // render_state.SamplerDefault = pFontSampler;
         // platform_io.Renderer_RenderState = &render_state;
 
         // Render command lists
@@ -304,7 +318,7 @@ public class ImGui_Impl_DX11
             SysMemPitch = desc.Width * 4,
             SysMemSlicePitch = 0
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateTexture2D(in desc, in subResource, ref pTexture));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateTexture2D(in desc, in subResource, ref pTexture));
         Debug.Assert(pTexture.Handle != null);
 
         // Create texture view
@@ -318,29 +332,29 @@ public class ImGui_Impl_DX11
                 MostDetailedMip = 0,
             },
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateShaderResourceView(pTexture, in srvDesc, ref bd.pFontTextureView));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateShaderResourceView(pTexture, in srvDesc, ref pFontTextureView));
         pTexture.Release();
 
         // Store our identifier
-        io.Fonts.SetTexID((IntPtr)Unsafe.AsPointer(ref bd.pFontTextureView));
+        io.Fonts.SetTexID((IntPtr)Unsafe.AsPointer(ref pFontTextureView));
     }
     
     
     private unsafe void ImGui_ImplDX11_DestroyFontsTexture()
     {
-        if (bd.pFontTextureView.Handle != null)
+        if (pFontTextureView.Handle != null)
         {
-            bd.pFontTextureView.Release();
-            bd.pFontTextureView = null;
+            pFontTextureView.Release();
+            pFontTextureView = null;
             ImGui.GetIO().Fonts.SetTexID(0); // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
         }
     }
     
     internal unsafe bool ImGui_ImplDX11_CreateDeviceObjects()
     {
-        if (bd.pd3dDevice.Handle == null)
+        if (pd3dDevice.Handle == null)
             return false;
-        if (bd.pFontSampler.Handle != null)
+        if (pFontSampler.Handle != null)
             ImGui_ImplDX11_InvalidateDeviceObjects();
 
         // By using D3DCompile() from <d3dcompiler.h> / d3dcompiler.lib, we introduce a dependency to a given version of d3dcompiler_XX.dll (see D3DCOMPILER_DLL_A)
@@ -405,9 +419,9 @@ public class ImGui_Impl_DX11
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
         }
 
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateVertexShader(
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateVertexShader(
             vertexShaderBlob.GetBufferPointer(), vertexShaderBlob.GetBufferSize(),
-            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref bd.pVertexShader));
+            ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pVertexShader));
         // TODO: Release with a try/catch block
         // {
         //     vertexShaderBlob.Release();
@@ -452,9 +466,9 @@ public class ImGui_Impl_DX11
                     InstanceDataStepRate = 0
                 },
             ];
-            SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateInputLayout(local_layout, 3,
+            SilkMarshal.ThrowHResult(pd3dDevice.CreateInputLayout(local_layout, 3,
                     vertexShaderBlob.GetBufferPointer(), (uint)vertexShaderBlob.GetBufferSize(),
-                    bd.pInputLayout.GetAddressOf()));
+                    pInputLayout.GetAddressOf()));
             // TODO: Release with a try/catch block
             // {
             //     vertexShaderBlob.Release();
@@ -474,7 +488,7 @@ public class ImGui_Impl_DX11
             CPUAccessFlags = (uint)CpuAccessFlag.Write,
             MiscFlags = 0
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateBuffer(in desc, null, ref bd.pVertexConstantBuffer));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateBuffer(in desc, null, ref pVertexConstantBuffer));
 
         // Create the pixel shader
         string pixelShader =
@@ -519,8 +533,8 @@ public class ImGui_Impl_DX11
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
         }
 
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreatePixelShader(pixelShaderBlob.GetBufferPointer(), pixelShaderBlob.GetBufferSize(),
-                ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref bd.pPixelShader));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreatePixelShader(pixelShaderBlob.GetBufferPointer(), pixelShaderBlob.GetBufferSize(),
+                ref Unsafe.NullRef<ID3D11ClassLinkage>(), ref pPixelShader));
         // TODO: Release with a try/catch block
         // {
         //     pixelShaderBlob.Release();
@@ -549,7 +563,7 @@ public class ImGui_Impl_DX11
                 }
             }
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateBlendState(in blendDesc, ref bd.pBlendState));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateBlendState(in blendDesc, ref pBlendState));
 
         // Create the rasterizer state
         RasterizerDesc rasterizerDesc = new RasterizerDesc
@@ -559,7 +573,7 @@ public class ImGui_Impl_DX11
             ScissorEnable = true,
             DepthClipEnable = true
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateRasterizerState(in rasterizerDesc, ref bd.pRasterizerState));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateRasterizerState(in rasterizerDesc, ref pRasterizerState));
 
         // Create depth-stencil State
         DepthStencilDesc depthStencilDesc = new DepthStencilDesc
@@ -577,7 +591,7 @@ public class ImGui_Impl_DX11
             },
         };
         depthStencilDesc.BackFace = depthStencilDesc.FrontFace;
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateDepthStencilState(in depthStencilDesc, ref bd.pDepthStencilState));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateDepthStencilState(in depthStencilDesc, ref pDepthStencilState));
 
         // Create texture sampler
         // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
@@ -592,7 +606,7 @@ public class ImGui_Impl_DX11
             MinLOD = 0f,
             MaxLOD = 0f
         };
-        SilkMarshal.ThrowHResult(bd.pd3dDevice.CreateSamplerState(in samplerDesc, ref bd.pFontSampler));
+        SilkMarshal.ThrowHResult(pd3dDevice.CreateSamplerState(in samplerDesc, ref pFontSampler));
 
         ImGui_ImplDX11_CreateFontsTexture();
 
@@ -602,21 +616,21 @@ public class ImGui_Impl_DX11
     
     private unsafe void ImGui_ImplDX11_InvalidateDeviceObjects()
     {
-        if (bd.pd3dDevice.Handle == null)
+        if (pd3dDevice.Handle == null)
             return;
 
         ImGui_ImplDX11_DestroyFontsTexture();
 
-        if (bd.pFontSampler.Handle != null)           { bd.pFontSampler.Release(); bd.pFontSampler = null; }
-        if (bd.pIB.Handle != null)                    { bd.pIB.Release(); bd.pIB = null; }
-        if (bd.pVB.Handle != null)                    { bd.pVB.Release(); bd.pVB = null; }
-        if (bd.pBlendState.Handle != null)            { bd.pBlendState.Release(); bd.pBlendState = null; }
-        if (bd.pDepthStencilState.Handle != null)     { bd.pDepthStencilState.Release(); bd.pDepthStencilState = null; }
-        if (bd.pRasterizerState.Handle != null)       { bd.pRasterizerState.Release(); bd.pRasterizerState = null; }
-        if (bd.pPixelShader.Handle != null)           { bd.pPixelShader.Release(); bd.pPixelShader = null; }
-        if (bd.pVertexConstantBuffer.Handle != null)  { bd.pVertexConstantBuffer.Release(); bd.pVertexConstantBuffer = null; }
-        if (bd.pInputLayout.Handle != null)           { bd.pInputLayout.Release(); bd.pInputLayout = null; }
-        if (bd.pVertexShader.Handle != null)          { bd.pVertexShader.Release(); bd.pVertexShader = null; }
+        if (pFontSampler.Handle != null)           { pFontSampler.Release(); pFontSampler = null; }
+        if (pIB.Handle != null)                    { pIB.Release(); pIB = null; }
+        if (pVB.Handle != null)                    { pVB.Release(); pVB = null; }
+        if (pBlendState.Handle != null)            { pBlendState.Release(); pBlendState = null; }
+        if (pDepthStencilState.Handle != null)     { pDepthStencilState.Release(); pDepthStencilState = null; }
+        if (pRasterizerState.Handle != null)       { pRasterizerState.Release(); pRasterizerState = null; }
+        if (pPixelShader.Handle != null)           { pPixelShader.Release(); pPixelShader = null; }
+        if (pVertexConstantBuffer.Handle != null)  { pVertexConstantBuffer.Release(); pVertexConstantBuffer = null; }
+        if (pInputLayout.Handle != null)           { pInputLayout.Release(); pInputLayout = null; }
+        if (pVertexShader.Handle != null)          { pVertexShader.Release(); pVertexShader = null; }
     }
 
     
@@ -629,10 +643,7 @@ public class ImGui_Impl_DX11
         Debug.Assert(io.BackendRendererUserData == IntPtr.Zero, "Already initialized a renderer backend!");
 
         // Setup backend capabilities flags
-        bd = new ImGui_ImplDX11_Data();
         // Do not use BackendRendererUserData it messed my pointers randomly
-        // io.BackendRendererUserData = (IntPtr)Unsafe.AsPointer(ref bd);
-        // io.BackendRendererName = "imgui_impl_dx11";
         io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
 
         // Get factory from device
@@ -640,18 +651,18 @@ public class ImGui_Impl_DX11
         ComPtr<IDXGIAdapter> pDXGIAdapter = default;
         ComPtr<IDXGIFactory> pFactory = default;
 
-        // if (device->QueryInterface(out pDXGIDevice) == 0)
-        //     if (pDXGIDevice.GetParent(out pDXGIAdapter) == 0)
-        //         if (pDXGIAdapter.GetParent(out pFactory) == 0)
-        //         {
-                    bd.pd3dDevice = device;
-                    bd.pd3dDeviceContext = device_context;
-                    bd.pFactory = pFactory;
-        //         }
-        // pDXGIDevice.Release();
-        // pDXGIAdapter.Release();
-        // bd.pd3dDevice.AddRef();
-        // bd.pd3dDeviceContext.AddRef();
+        if (device->QueryInterface(out pDXGIDevice) == 0)
+            if (pDXGIDevice.GetParent(out pDXGIAdapter) == 0)
+                if (pDXGIAdapter.GetParent(out pFactory) == 0)
+                {
+                    pd3dDevice = device;
+                    pd3dDeviceContext = device_context;
+                    pFactory = pFactory;
+                }
+        pDXGIDevice.Release();
+        pDXGIAdapter.Release();
+        pd3dDevice.AddRef();
+        pd3dDeviceContext.AddRef();
 
         return true;
     }
@@ -663,9 +674,9 @@ public class ImGui_Impl_DX11
         ImGuiIOPtr io = ImGui.GetIO();
 
         ImGui_ImplDX11_InvalidateDeviceObjects();
-        bd.pFactory.Release();
-        bd.pd3dDevice.Release();
-        bd.pd3dDeviceContext.Release();
+        pFactory.Release();
+        pd3dDevice.Release();
+        pd3dDeviceContext.Release();
         // io.BackendRendererName = null;
         io.BackendRendererUserData = IntPtr.Zero;
         io.BackendFlags &= ~ImGuiBackendFlags.RendererHasVtxOffset;
@@ -680,41 +691,13 @@ public class ImGui_Impl_DX11
         // Debug.Assert(bd is not null, "Context or backend not initialized! Did you call ImGui_ImplDX11_Init()?");
 
         // TODO: Check if condition
-        if (bd.pFontSampler.Handle == null)
+        if (pFontSampler.Handle == null)
             ImGui_ImplDX11_CreateDeviceObjects();
     }
     
     #endregion
     
     #region Structs
-
-    // DirectX11 data
-    public struct ImGui_ImplDX11_Data
-    {
-        public ComPtr<ID3D11Device>               pd3dDevice =          default;
-        public ComPtr<ID3D11DeviceContext>        pd3dDeviceContext =   default;
-        public ComPtr<IDXGIFactory>               pFactory =            default;
-        public ComPtr<ID3D11Buffer>               pVB =                 default;
-        public ComPtr<ID3D11Buffer>               pIB =                 default;
-        public ComPtr<ID3D11VertexShader>         pVertexShader =       default;
-        public ComPtr<ID3D11InputLayout>          pInputLayout =        default;
-        public ComPtr<ID3D11Buffer>               pVertexConstantBuffer=default;
-        public ComPtr<ID3D11PixelShader>          pPixelShader =        default;    
-        public ComPtr<ID3D11SamplerState>         pFontSampler =        default;
-        public ComPtr<ID3D11ShaderResourceView>   pFontTextureView =    default;
-        public ComPtr<ID3D11RasterizerState>      pRasterizerState =    default;
-        public ComPtr<ID3D11BlendState>           pBlendState =         default;
-        public ComPtr<ID3D11DepthStencilState>    pDepthStencilState =  default;
-        public int                         VertexBufferSize;
-        public int                         IndexBufferSize;
-
-        public ImGui_ImplDX11_Data()
-        {
-            // memset((void*)this, 0, sizeof(*this));
-            VertexBufferSize = 5000;
-            IndexBufferSize = 10000;
-        }
-    }
 
     struct VERTEX_CONSTANT_BUFFER_DX11
     {
