@@ -30,6 +30,7 @@ public class PeanutWindow
     private PeanutGraphics? graphics;
 
     private ImGui_Impl_DX11 instance;
+    private ImGuiDX11Controller controller;
 
     public PeanutWindow()
     {
@@ -47,7 +48,7 @@ public class PeanutWindow
         };
         window = Window.Create(options);
         
-        // ImGuiDX11Controller controller = null;
+        controller = null;
         instance = new ImGui_Impl_DX11();
 
         // Assign events.
@@ -82,20 +83,21 @@ public class PeanutWindow
         input.Mice[0].MouseMove += OnMouseMove;
         
         // Init ImGui.
-        ImGui.CreateContext();
-        ImGui.StyleColorsDark();
+        // IntPtr ctx = ImGui.CreateContext();
+        // ImGui.SetCurrentContext(ctx);
+        // ImGui.StyleColorsDark();
 
         // ImGui.ImGui_ImplWin32_Init(window!.Native!.DXHandle!.Value);
-        ImGuiViewportPtr mainVP = ImGui.GetMainViewport();
-        mainVP.PlatformHandle = window!.Native!.DXHandle!.Value;
-        mainVP.PlatformHandleRaw = window!.Native!.DXHandle!.Value;
+        // ImGuiViewportPtr mainVP = ImGui.GetMainViewport();
+        // mainVP.PlatformHandle = window!.Native!.DXHandle!.Value;
+        // mainVP.PlatformHandleRaw = window!.Native!.DXHandle!.Value;
         
         // TODO: Add ImGui windows messages handling (aka events).
         // ImGui.ImGui_ImplWin32_WndProcHandler()
-        ImGui.GetIO().ConfigDebugIsDebuggerPresent = true;
+        // ImGui.GetIO().ConfigDebugIsDebuggerPresent = true;
         
         // Create a graphics object.
-        graphics = new PeanutGraphics(window!, window!.FramebufferSize, ref instance);
+        graphics = new PeanutGraphics(window!, window!.FramebufferSize, ref instance, ref controller, ref input);
     }
 
 
@@ -119,27 +121,32 @@ public class PeanutWindow
 
     private unsafe void OnRender(double deltaSeconds)
     {
+        controller.Update((float)deltaSeconds);
         // Time is paused when the space key is pressed.
         graphics?.BeginFrame(pressedKeys[Key.Space] ? 0f : deltaSeconds);
         graphics?.Draw(false, cameraPos, window!.FramebufferSize, pressedKeys[Key.Space] ? 0f : deltaSeconds);
         
         // ImGui
         // ImGui.ImGui_ImplWin32_NewFrame();
-        ImGuiIOPtr io = ImGui.GetIO();
-        io.DisplaySize = new Vector2(window!.FramebufferSize.X, window!.FramebufferSize.Y);
-        io.DisplayFramebufferScale = new Vector2(1, 1);
-        io.DeltaTime = (float)deltaSeconds;
-        io.Fonts.AddFontDefault();
-        instance.ImGui_ImplDX11_NewFrame();
-        ImGui.NewFrame();
+        // ImGuiIOPtr io = ImGui.GetIO();
+        // io.DisplaySize = new Vector2(window!.FramebufferSize.X, window!.FramebufferSize.Y);
+        // io.DisplayFramebufferScale = new Vector2(1, 1);
+        // io.DeltaTime = (float)deltaSeconds;
+        // io.Fonts.AddFontDefault();
+        // instance.ImGui_ImplDX11_NewFrame();
+        // ImGui.NewFrame();
         
-        bool showDemoWindow = true;
-        if (showDemoWindow)
-        {
-            ImGui.ShowDemoWindow(ref showDemoWindow);
-        }
-        ImGui.Render();
-        instance.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
+        // bool showDemoWindow = true;
+        // if (showDemoWindow)
+        // {
+        //     ImGui.ShowDemoWindow(ref showDemoWindow);
+        // }
+        // ImGui.Render();
+        // instance.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
+        //
+        // ImGui.ShowDemoWindow();
+        ImGui.ShowMetricsWindow();
+        controller.Render();
         
         graphics?.EndFrame();
     }

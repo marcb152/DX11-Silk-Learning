@@ -1,4 +1,4 @@
-﻿Texture2D tex;
+﻿Texture2D tex: register(t1);
 
 SamplerState splr;
 

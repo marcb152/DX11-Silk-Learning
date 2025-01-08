@@ -59,6 +59,6 @@ public class PeanutTexture : IBindable
     
     public void Bind(ref PeanutGraphics graphics)
     {
-        graphics.GetContext.PSSetShaderResources(0u, 1u, ref resourceView);
+        graphics.GetContext.PSSetShaderResources(1u, 1u, ref resourceView);
     }
 }

@@ -7,7 +7,9 @@ using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
+using Silk.NET.Input;
 using Silk.NET.Maths;
+using Silk.NET.Windowing;
 
 namespace DX11_Silk.NET_Learning;
 
@@ -48,9 +50,9 @@ public class PeanutGraphics : IDisposable
 
     private List<Drawable> boxes = [];
 
-    public unsafe PeanutGraphics(INativeWindowSource window, Vector2D<int> FramebufferSize, ref ImGui_Impl_DX11 instance)
+    public unsafe PeanutGraphics(IView window, Vector2D<int> FramebufferSize, ref ImGui_Impl_DX11 instance, ref ImGuiDX11Controller controller, ref IInputContext input)
     {
-        _instance = instance;
+        // _instance = instance;
         // Whether or not to force use of DXVK on platforms where native DirectX implementations are available
         const bool forceDxvk = false;
 
@@ -110,6 +112,9 @@ public class PeanutGraphics : IDisposable
                 Console.WriteLine(SilkMarshal.PtrToString((nint)msg.PDescription));
             });
         }
+        ImGuiFontConfig fontConfig = new ImGuiFontConfig("C:\\Windows\\Fonts\\arial.ttf", 16, ptr => ptr.Fonts.GetGlyphRangesDefault());
+        controller = new ImGuiDX11Controller(device, deviceContext, window, input, instance, fontConfig);
+
         // Obtain the framebuffer for the swapchain's backbuffer.
         // Gets released when the execution leaves the scope thanks to using.
         using var backbuffer = swapchain.GetBuffer<ID3D11Texture2D>(0);
@@ -193,7 +198,7 @@ public class PeanutGraphics : IDisposable
         deviceContext.RSSetViewports(1u, in viewport);
         
         // Init ImGui.
-        instance.ImGui_ImplDX11_Init(device, deviceContext);
+        // instance.ImGui_ImplDX11_Init(device, deviceContext);
     }
 
     public unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -271,7 +276,7 @@ public class PeanutGraphics : IDisposable
     public void Dispose()
     {
         // Dispose of ImGui.
-        _instance.ImGui_ImplDX11_Shutdown();
+        // _instance.ImGui_ImplDX11_Shutdown();
         // Clean up any resources.
         factory.Dispose();
         swapchain.Dispose();

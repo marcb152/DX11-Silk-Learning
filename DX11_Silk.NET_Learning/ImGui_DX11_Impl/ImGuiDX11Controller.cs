@@ -5,13 +5,13 @@ using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using Silk.NET.Input;
 using Silk.NET.Maths;
-using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
 namespace DX11_Silk.NET_Learning.ImGui_DX11_Impl;
 
 public class ImGuiDX11Controller
 {
+    private ImGui_Impl_DX11 instance;
     private ComPtr<ID3D11Device> _device;
     private ComPtr<ID3D11DeviceContext> _deviceContext;
     private IView _view;
@@ -28,8 +28,11 @@ public class ImGuiDX11Controller
     /// <summary>
     /// Constructs a new ImGuiController with font configuration and onConfigure Action.
     /// </summary>
-    public unsafe ImGuiDX11Controller(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, IView view, IInputContext input, ImGuiFontConfig? imGuiFontConfig = null, Action onConfigureIO = null)
+    public unsafe ImGuiDX11Controller(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext,
+        IView view, IInputContext input, ImGui_Impl_DX11 instance,
+        ImGuiFontConfig? imGuiFontConfig = null, Action onConfigureIO = null)
     {
+        this.instance = instance;
         Init(device, deviceContext, view, input);
 
         ImGuiIOPtr io = ImGui.GetIO();
@@ -46,6 +49,8 @@ public class ImGuiDX11Controller
 
         // ImGui_Impl_DX11.ImGui_ImplDX11_Init(device, deviceContext);
         // ImGui_Impl_DX11.ImGui_ImplDX11_CreateDeviceObjects();
+        instance.ImGui_ImplDX11_Init(device, deviceContext);
+        instance.ImGui_ImplDX11_CreateDeviceObjects();
         // CreateDeviceResources();
 
         SetPerFrameImGuiData(1f / 60f);
@@ -146,6 +151,7 @@ public class ImGuiDX11Controller
 
             _frameBegun = false;
             ImGui.Render();
+            instance.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
             // ImGui_Impl_DX11.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
             // RenderImDrawData(ImGui.GetDrawData());
 
