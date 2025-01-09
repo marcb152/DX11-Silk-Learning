@@ -14,7 +14,7 @@ namespace DX11_Silk.NET_Learning.ImGui_DX11_Impl;
 
 public class ImGui_Impl_DX11
 {
-    public static uint D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE = 16u;
+    private const uint D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE = 16u;
 
     // DirectX11 data
     private ComPtr<ID3D11Device>               pd3dDevice =          default;
@@ -31,79 +31,98 @@ public class ImGui_Impl_DX11
     private ComPtr<ID3D11RasterizerState>      pRasterizerState =    default;
     private ComPtr<ID3D11BlendState>           pBlendState =         default;
     private ComPtr<ID3D11DepthStencilState>    pDepthStencilState =  default;
-    private int                         VertexBufferSize = 5_000;
-    private int                         IndexBufferSize = 10_000;
+    private int                         vertexBufferSize = 5_000;
+    private int                         indexBufferSize = 10_000;
     
     // Do not use BackendRendererUserData, it messed up my pointers randomly
     
     #region Functions
 
-    private unsafe void ImGui_ImplDX11_SetupRenderState(ImDrawData* draw_data, ID3D11DeviceContext* device_ctx)
+    /// <summary>
+    /// Setups basic/defaults DX11 bindings/state.
+    /// </summary>
+    /// <param name="displaySize">
+    /// Size of the display for viewport setup.
+    /// </param>
+    /// <param name="deviceContext">
+    /// D3D11 device context pointer.
+    /// </param>
+    private unsafe void ImGui_ImplDX11_SetupRenderState(Vector2 displaySize, ID3D11DeviceContext* deviceContext)
     {
         // Setup viewport
         Viewport vp = new Viewport
         {
-            Width = draw_data->DisplaySize.X,
-            Height = draw_data->DisplaySize.Y,
+            Width = displaySize.X,
+            Height = displaySize.Y,
             MinDepth = 0.0f,
             MaxDepth = 1.0f
         };
         vp.TopLeftX = vp.TopLeftY = 0;
-        device_ctx->RSSetViewports(1, in vp);
+        deviceContext->RSSetViewports(1, in vp);
 
         // Setup shader and vertex buffers
         uint stride = (uint)sizeof(ImDrawVert);
         uint offset = 0;
         
-        device_ctx->IASetInputLayout(pInputLayout);
-        device_ctx->IASetVertexBuffers(0, 1, ref pVB, in stride, in offset);
+        deviceContext->IASetInputLayout(pInputLayout);
+        deviceContext->IASetVertexBuffers(0, 1, ref pVB, in stride, in offset);
         // TODO: Warning there, ImDrawIdx is not defined by ImGui.NET, and uses R16_UINT by default (16-bit indices)
         // Using R32_UINT would require recompiling cimgui with the correct define
         // See https://github.com/ImGuiNET/ImGui.NET/issues/248
         // Original code: https://github.com/ocornut/imgui/blob/master/imgui.h#L260
-        device_ctx->IASetIndexBuffer(pIB, Format.FormatR16Uint, 0);
-        device_ctx->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
-        device_ctx->VSSetShader(pVertexShader, null, 0);
-        device_ctx->VSSetConstantBuffers(0, 1, ref pVertexConstantBuffer);
-        device_ctx->PSSetShader(pPixelShader, null, 0);
-        device_ctx->PSSetSamplers(0, 1, ref pFontSampler);
-        device_ctx->GSSetShader(null, null, 0);
-        device_ctx->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-        device_ctx->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-        device_ctx->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        deviceContext->IASetIndexBuffer(pIB, Format.FormatR16Uint, 0);
+        deviceContext->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
+        deviceContext->VSSetShader(pVertexShader, null, 0);
+        deviceContext->VSSetConstantBuffers(0, 1, ref pVertexConstantBuffer);
+        deviceContext->PSSetShader(pPixelShader, null, 0);
+        deviceContext->PSSetSamplers(0, 1, ref pFontSampler);
+        deviceContext->GSSetShader(null, null, 0);
+        deviceContext->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        deviceContext->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
 
         // Setup blend state
-        float[] blend_factor = [0f, 0f, 0f, 0f];
-        fixed (float* blend_factor_ptr = blend_factor)
+        float[] blendFactor = [0f, 0f, 0f, 0f];
+        fixed (float* blendFactorPtr = blendFactor)
         {
-            device_ctx->OMSetBlendState(pBlendState, blend_factor_ptr, 0xffffffff);
+            deviceContext->OMSetBlendState(pBlendState, blendFactorPtr, 0xffffffff);
         }
-        device_ctx->OMSetDepthStencilState(pDepthStencilState, 0);
-        device_ctx->RSSetState(pRasterizerState);
+        deviceContext->OMSetDepthStencilState(pDepthStencilState, 0);
+        deviceContext->RSSetState(pRasterizerState);
     }
     
-    // Render function
-    public unsafe void ImGui_ImplDX11_RenderDrawData(ImDrawDataPtr draw_data)
+    /// <summary>
+    /// Renders the raw ImGui draw data.
+    /// <see cref="ImGui_ImplDX11_Init"/> and <see cref="ImGui_ImplDX11_CreateDeviceObjects"/> must have been called first.
+    /// </summary>
+    /// <param name="drawDataPtr">
+    /// ImGui draw data to send to the graphics pipeline to render.
+    /// </param>
+    /// <exception cref="NotImplementedException">
+    /// User callbacks are not implemented and will throw.
+    /// </exception>
+    public unsafe void ImGui_ImplDX11_RenderDrawData(ImDrawDataPtr drawDataPtr)
     {
         // Avoid rendering when minimized
-        if (draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f)
+        if (drawDataPtr.DisplaySize.X <= 0.0f || drawDataPtr.DisplaySize.Y <= 0.0f)
             return;
 
         ID3D11DeviceContext* deviceCtx = pd3dDeviceContext;
 
         // Create and grow vertex/index buffers if needed
-        if ((long)pVB.Handle == IntPtr.Zero || VertexBufferSize < draw_data.TotalVtxCount)
+        if ((long)pVB.Handle == IntPtr.Zero || vertexBufferSize < drawDataPtr.TotalVtxCount)
         {
+            // Looks like it is never called, but there's an OR gate right above
             if ((long)pVB.Handle != IntPtr.Zero)
             {
                 pVB.Release();
                 pVB = null;
             }
-            VertexBufferSize = draw_data.TotalVtxCount + 5000;
+            vertexBufferSize = drawDataPtr.TotalVtxCount + 5000;
             BufferDesc desc = new BufferDesc
             {
                 Usage = Usage.Dynamic,
-                ByteWidth = (uint)(VertexBufferSize * sizeof(ImDrawVert)),
+                ByteWidth = (uint)(vertexBufferSize * sizeof(ImDrawVert)),
                 BindFlags = (uint)BindFlag.VertexBuffer,
                 CPUAccessFlags = (uint)CpuAccessFlag.Write,
                 MiscFlags = 0
@@ -111,18 +130,19 @@ public class ImGui_Impl_DX11
             SilkMarshal.ThrowHResult(
                 pd3dDevice.CreateBuffer(in desc, null, ref pVB));
         }
-        if ((long)pIB.Handle == IntPtr.Zero || IndexBufferSize < draw_data.TotalIdxCount)
+        if ((long)pIB.Handle == IntPtr.Zero || indexBufferSize < drawDataPtr.TotalIdxCount)
         {
+            // Looks like it is never called, but there's an OR gate right above
             if ((long)pIB.Handle != IntPtr.Zero)
             {
                 pIB.Release();
                 pIB = null;
             }
-            IndexBufferSize = draw_data.TotalIdxCount + 10000;
+            indexBufferSize = drawDataPtr.TotalIdxCount + 10000;
             BufferDesc desc = new BufferDesc
             {
                 Usage = Usage.Dynamic,
-                ByteWidth = (uint)(IndexBufferSize * sizeof(ushort)),
+                ByteWidth = (uint)(indexBufferSize * sizeof(ushort)),
                 BindFlags = (uint)BindFlag.IndexBuffer,
                 CPUAccessFlags = (uint)CpuAccessFlag.Write
             };
@@ -131,45 +151,46 @@ public class ImGui_Impl_DX11
         }
 
         // Upload vertex/index data into a single contiguous GPU buffer
-        MappedSubresource vtx_resource = default;
-        MappedSubresource idx_resource = default;
+        MappedSubresource vtxResource = default;
+        MappedSubresource idxResource = default;
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pVB, 0, Map.WriteDiscard, 0, ref vtx_resource));
+            deviceCtx->Map(pVB, 0, Map.WriteDiscard, 0, ref vtxResource));
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pIB, 0, Map.WriteDiscard, 0, ref idx_resource));
+            deviceCtx->Map(pIB, 0, Map.WriteDiscard, 0, ref idxResource));
         // TODO: Check those casts, should be fine but idk
-        ImDrawVert* vtx_dst = (ImDrawVert*)vtx_resource.PData;
-        ushort* idx_dst = (ushort*)idx_resource.PData;
-        for (int n = 0; n < draw_data.CmdListsCount; n++)
+        ImDrawVert* vtxDstResource = (ImDrawVert*)vtxResource.PData;
+        ushort* idxDstResource = (ushort*)idxResource.PData;
+        for (int n = 0; n < drawDataPtr.CmdListsCount; n++)
         {
-            ImDrawListPtr draw_list = draw_data.CmdLists[n];
-            Unsafe.CopyBlock(vtx_dst, draw_list.VtxBuffer.Data.ToPointer(), (uint)(draw_list.VtxBuffer.Size * sizeof(ImDrawVert)));
-            Unsafe.CopyBlock(idx_dst, draw_list.IdxBuffer.Data.ToPointer(), (uint)(draw_list.IdxBuffer.Size * sizeof(ushort)));
-            vtx_dst += draw_list.VtxBuffer.Size;
-            idx_dst += draw_list.IdxBuffer.Size;
+            ImDrawListPtr drawListPtr = drawDataPtr.CmdLists[n];
+            Unsafe.CopyBlock(vtxDstResource, drawListPtr.VtxBuffer.Data.ToPointer(), (uint)(drawListPtr.VtxBuffer.Size * sizeof(ImDrawVert)));
+            Unsafe.CopyBlock(idxDstResource, drawListPtr.IdxBuffer.Data.ToPointer(), (uint)(drawListPtr.IdxBuffer.Size * sizeof(ushort)));
+            vtxDstResource += drawListPtr.VtxBuffer.Size;
+            idxDstResource += drawListPtr.IdxBuffer.Size;
         }
         deviceCtx->Unmap(pVB, 0);
         deviceCtx->Unmap(pIB, 0);
 
         // Setup orthographic projection matrix into our constant buffer
         // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
-        MappedSubresource mapped_resource = default;
+        MappedSubresource mappedResource = default;
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mapped_resource));
-        VERTEX_CONSTANT_BUFFER_DX11* constant_buffer = (VERTEX_CONSTANT_BUFFER_DX11*)mapped_resource.PData;
-        float L = draw_data.DisplayPos.X;
-        float R = draw_data.DisplayPos.X + draw_data.DisplaySize.X;
-        float T = draw_data.DisplayPos.Y;
-        float B = draw_data.DisplayPos.Y + draw_data.DisplaySize.Y;
+            deviceCtx->Map(pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mappedResource));
+        VERTEX_CONSTANT_BUFFER_DX11* constantBuffer = (VERTEX_CONSTANT_BUFFER_DX11*)mappedResource.PData;
+        float L = drawDataPtr.DisplayPos.X;
+        float R = drawDataPtr.DisplayPos.X + drawDataPtr.DisplaySize.X;
+        float T = drawDataPtr.DisplayPos.Y;
+        float B = drawDataPtr.DisplayPos.Y + drawDataPtr.DisplaySize.Y;
         Matrix4X4<float> mvp = new Matrix4X4<float>(
             2.0f / (R - L), 0.0f, 0.0f, 0.0f,
             0.0f, 2.0f / (T - B), 0.0f, 0.0f,
             0.0f, 0.0f, 0.5f, 0.0f,
             (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f
         );
-        Unsafe.CopyBlock(Unsafe.AsPointer(ref constant_buffer->mvp), Unsafe.AsPointer(ref mvp), (uint)sizeof(Matrix4X4<float>));
+        Unsafe.CopyBlock(Unsafe.AsPointer(ref constantBuffer->mvp), Unsafe.AsPointer(ref mvp), (uint)sizeof(Matrix4X4<float>));
         deviceCtx->Unmap(pVertexConstantBuffer, 0);
 
+        // Backup previous DX11 state
         BACKUP_DX11_STATE old = new BACKUP_DX11_STATE();
         old.ScissorRectsCount = old.ViewportsCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
         deviceCtx->RSGetScissorRects(ref old.ScissorRectsCount, old.ScissorRects);
@@ -191,51 +212,44 @@ public class ImGui_Impl_DX11
         deviceCtx->IAGetInputLayout(ref old.InputLayout);
 
         // Setup desired DX state
-        ImGui_ImplDX11_SetupRenderState(draw_data, deviceCtx);
+        ImGui_ImplDX11_SetupRenderState(drawDataPtr.DisplaySize, deviceCtx);
 
         // Render command lists
         // (Because we merged all buffers into a single one, we maintain our own offset into them)
-        int global_idx_offset = 0;
-        int global_vtx_offset = 0;
-        Vector2 clip_off = draw_data.DisplayPos;
-        for (int n = 0; n < draw_data.CmdListsCount; n++)
+        int globalIdxOffset = 0;
+        int globalVtxOffset = 0;
+        Vector2 clipOff = drawDataPtr.DisplayPos;
+        for (int n = 0; n < drawDataPtr.CmdListsCount; n++)
         {
-            ImDrawListPtr draw_list = draw_data.CmdLists[n];
-            for (int cmd_i = 0; cmd_i < draw_list.CmdBuffer.Size; cmd_i++)
+            ImDrawListPtr drawListPtr = drawDataPtr.CmdLists[n];
+            for (int cmd_i = 0; cmd_i < drawListPtr.CmdBuffer.Size; cmd_i++)
             {
-                ImDrawCmdPtr pcmd = draw_list.CmdBuffer[cmd_i];
-                if ((long)pcmd.UserCallback != IntPtr.Zero)
+                ImDrawCmdPtr drawCmdPtr = drawListPtr.CmdBuffer[cmd_i];
+                if ((long)drawCmdPtr.UserCallback != IntPtr.Zero)
                 {
-                    // User callback, registered via ImDrawList::AddCallback()
-                    // (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
-                    // TODO: Implement UserCallback to request the renderer to reset render state
-                    // if (pcmd.UserCallback == ImDrawCallback_ResetRenderState)
-                    //     ImGui_ImplDX11_SetupRenderState(draw_data, device);
-                    // else
-                    //     pcmd.UserCallback(draw_list, pcmd);
                     throw new NotImplementedException();
                 }
                 else
                 {
                     // Project scissor/clipping rectangles into framebuffer space
-                    Vector2D<float> clip_min = new Vector2D<float>(pcmd.ClipRect.X - clip_off.X, pcmd.ClipRect.Y - clip_off.Y);
-                    Vector2D<float> clip_max = new Vector2D<float>(pcmd.ClipRect.Z - clip_off.X, pcmd.ClipRect.W - clip_off.Y);
-                    if (clip_max.X <= clip_min.X || clip_max.Y <= clip_min.Y)
+                    Vector2D<float> clipMin = new Vector2D<float>(drawCmdPtr.ClipRect.X - clipOff.X, drawCmdPtr.ClipRect.Y - clipOff.Y);
+                    Vector2D<float> clipMax = new Vector2D<float>(drawCmdPtr.ClipRect.Z - clipOff.X, drawCmdPtr.ClipRect.W - clipOff.Y);
+                    if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
                         continue;
 
                     // Apply scissor/clipping rectangle
-                    Box2D<int> r = new Box2D<int>((int)clip_min.X, (int)clip_min.Y, (int)clip_max.X, (int)clip_max.Y);
+                    Box2D<int> r = new Box2D<int>((int)clipMin.X, (int)clipMin.Y, (int)clipMax.X, (int)clipMax.Y);
                     deviceCtx->RSSetScissorRects(1, in r);
 
                     // Bind texture, Draw
                     // TODO: This line made the program crash, because the font atlas texture was not generated and bound correctly
                     // ID3D11ShaderResourceView* texture_srv = (ID3D11ShaderResourceView*)pcmd.TextureId;
                     // deviceCtx->PSSetShaderResources(0, 1, &texture_srv);
-                    deviceCtx->DrawIndexed(pcmd.ElemCount, (uint)(pcmd.IdxOffset + global_idx_offset), (int)(pcmd.VtxOffset + global_vtx_offset));
+                    deviceCtx->DrawIndexed(drawCmdPtr.ElemCount, (uint)(drawCmdPtr.IdxOffset + globalIdxOffset), (int)(drawCmdPtr.VtxOffset + globalVtxOffset));
                 }
             }
-            global_idx_offset += draw_list.IdxBuffer.Size;
-            global_vtx_offset += draw_list.VtxBuffer.Size;
+            globalIdxOffset += drawListPtr.IdxBuffer.Size;
+            globalVtxOffset += drawListPtr.VtxBuffer.Size;
         }
 
         // Restore modified DX state
@@ -278,6 +292,9 @@ public class ImGui_Impl_DX11
         if (old.InputLayout != null) old.InputLayout->Release();
     }
     
+    /// <summary>
+    /// Creates the texture for the font atlas, retrieves it from ImGui and uploads it to the graphics system
+    /// </summary>
     private unsafe void ImGui_ImplDX11_CreateFontsTexture()
     {
         // Build texture atlas
@@ -327,13 +344,15 @@ public class ImGui_Impl_DX11
             pd3dDevice.CreateShaderResourceView(pTexture, in srvDesc, ref pFontTextureView));
         pTexture.Release();
 
-        // Store our identifier
+        // Store our identifier, not useful, but we keep it anyway
         io.Fonts.SetTexID((IntPtr)pFontTextureView.Handle);
         // Not sure where to put it, removed it from cmd buffers
         pd3dDeviceContext.PSSetShaderResources(0, 1, ref pFontTextureView);
     }
     
-    
+    /// <summary>
+    /// Destroys the font texture and clears the font texture view.
+    /// </summary>
     private unsafe void ImGui_ImplDX11_DestroyFontsTexture()
     {
         if ((long)pFontTextureView.Handle != IntPtr.Zero)
@@ -344,6 +363,12 @@ public class ImGui_Impl_DX11
         }
     }
     
+    /// <summary>
+    /// Creates all required DX11 resources for ImGui.
+    /// </summary>
+    /// <returns>
+    /// True if the resources were created successfully, false otherwise.
+    /// </returns>
     internal unsafe bool ImGui_ImplDX11_CreateDeviceObjects()
     {
         if ((long)pd3dDevice.Handle == IntPtr.Zero)
@@ -356,6 +381,7 @@ public class ImGui_Impl_DX11
         //  1) compile once, save the compiled shader blobs into a file or source code and pass them to CreateVertexShader()/CreatePixelShader() [preferred solution]
         //  2) use code to detect any version of the DLL and grab a pointer to D3DCompile from the DLL.
         // See https://github.com/ocornut/imgui/pull/638 for sources and details.
+        D3DCompiler compiler = D3DCompiler.GetApi();
 
         // Create the vertex shader
         string vertexShader =
@@ -388,7 +414,6 @@ public class ImGui_Impl_DX11
 
         ComPtr<ID3D10Blob> vertexShaderBlob = default;
         ComPtr<ID3D10Blob> errorBlob = default;
-        D3DCompiler compiler = D3DCompiler.GetApi();
         byte[] shaderBytes = Encoding.ASCII.GetBytes(vertexShader);
         HResult hr = compiler.Compile(
             in shaderBytes[0],
@@ -614,7 +639,9 @@ public class ImGui_Impl_DX11
         return true;
     }
     
-    
+    /// <summary>
+    /// Releases D3D11 resources created by <see cref="ImGui_ImplDX11_CreateDeviceObjects"/>.
+    /// </summary>
     private unsafe void ImGui_ImplDX11_InvalidateDeviceObjects()
     {
         if ((long)pd3dDevice.Handle == IntPtr.Zero)
@@ -622,20 +649,30 @@ public class ImGui_Impl_DX11
 
         ImGui_ImplDX11_DestroyFontsTexture();
 
-        if (pFontSampler.Handle != null)           { pFontSampler.Release(); pFontSampler = null; }
-        if (pIB.Handle != null)                    { pIB.Release(); pIB = null; }
-        if (pVB.Handle != null)                    { pVB.Release(); pVB = null; }
-        if (pBlendState.Handle != null)            { pBlendState.Release(); pBlendState = null; }
-        if (pDepthStencilState.Handle != null)     { pDepthStencilState.Release(); pDepthStencilState = null; }
-        if (pRasterizerState.Handle != null)       { pRasterizerState.Release(); pRasterizerState = null; }
-        if (pPixelShader.Handle != null)           { pPixelShader.Release(); pPixelShader = null; }
-        if (pVertexConstantBuffer.Handle != null)  { pVertexConstantBuffer.Release(); pVertexConstantBuffer = null; }
-        if (pInputLayout.Handle != null)           { pInputLayout.Release(); pInputLayout = null; }
-        if (pVertexShader.Handle != null)          { pVertexShader.Release(); pVertexShader = null; }
+        pFontSampler.Release();
+        pFontSampler = null;
+        pIB.Release();
+        pIB = null;
+        pVB.Release();
+        pVB = null;
+        pBlendState.Release();
+        pBlendState = null;
+        pDepthStencilState.Release();
+        pDepthStencilState = null;
+        pRasterizerState.Release();
+        pRasterizerState = null;
+        pPixelShader.Release();
+        pPixelShader = null;
+        pVertexConstantBuffer.Release();
+        pVertexConstantBuffer = null;
+        pInputLayout.Release();
+        pInputLayout = null;
+        pVertexShader.Release();
+        pVertexShader = null;
     }
 
     
-    public unsafe bool ImGui_ImplDX11_Init(ID3D11Device* device, ID3D11DeviceContext* device_context)
+    public unsafe bool ImGui_ImplDX11_Init(ID3D11Device* device, ID3D11DeviceContext* deviceContext)
     {
         ImGuiIOPtr io = ImGui.GetIO();
         
@@ -659,7 +696,7 @@ public class ImGui_Impl_DX11
                 if (pDXGIAdapter.GetParent(out pFactory) == 0)
                 {
                     pd3dDevice = device;
-                    pd3dDeviceContext = device_context;
+                    pd3dDeviceContext = deviceContext;
                     this.pFactory = pFactory;
                 }
             }
@@ -674,20 +711,15 @@ public class ImGui_Impl_DX11
     
     public unsafe void ImGui_ImplDX11_Shutdown()
     {
-        //TODO
-        // Debug.Assert(bd is not default(ImGui_ImplDX11_Data), "No renderer backend to shutdown, or already shutdown?");
         ImGuiIOPtr io = ImGui.GetIO();
 
         ImGui_ImplDX11_InvalidateDeviceObjects();
         pFactory.Release();
         pd3dDevice.Release();
         pd3dDeviceContext.Release();
-        // io.BackendRendererName = null;
+        
         io.BackendRendererUserData = IntPtr.Zero;
         io.BackendFlags &= ~ImGuiBackendFlags.RendererHasVtxOffset;
-        // TODO: Free memory when done
-        // bd = null;
-        // IM_DELETE(bd);
     }
     
     public unsafe void ImGui_ImplDX11_NewFrame()
@@ -734,7 +766,7 @@ public class ImGui_Impl_DX11
         public uint                        IndexBufferOffset, VertexBufferStride, VertexBufferOffset;
         public Format                      IndexBufferFormat;
         public ID3D11InputLayout*          InputLayout;
-    };
+    }
+    
     #endregion
-
 }

@@ -47,20 +47,12 @@ public class ImGuiDX11Controller
 
         io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
 
-        // ImGui_Impl_DX11.ImGui_ImplDX11_Init(device, deviceContext);
-        // ImGui_Impl_DX11.ImGui_ImplDX11_CreateDeviceObjects();
         instance.ImGui_ImplDX11_Init(device, deviceContext);
         instance.ImGui_ImplDX11_CreateDeviceObjects();
-        // CreateDeviceResources();
 
         SetPerFrameImGuiData(1f / 60f);
 
         BeginFrame();
-    }
-
-    public void MakeCurrent()
-    {
-        ImGuiNET.ImGui.SetCurrentContext(Context);
     }
 
     private void Init(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, IView view, IInputContext input)
@@ -759,6 +751,7 @@ public class ImGuiDX11Controller
         //
         // _fontTexture.Dispose();
         // _shader.Dispose();
+        instance.ImGui_ImplDX11_Shutdown();
 
         ImGui.DestroyContext(Context);
     }

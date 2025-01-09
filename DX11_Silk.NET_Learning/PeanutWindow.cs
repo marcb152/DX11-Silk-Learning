@@ -60,12 +60,11 @@ public class PeanutWindow
         // Run the window.
         window.Run();
 
+        // Dispose of the ImGui context.
+        controller?.Dispose();
+        
         // Dispose of the graphics object.
         graphics?.Dispose();
-        
-        // Dispose of the ImGui context.
-        // ImGui.ImGui_ImplWin32_Shutdown();
-        ImGui.DestroyContext();
 
         //dispose the window, and its internal resources
         window.Dispose();

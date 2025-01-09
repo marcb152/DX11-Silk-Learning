@@ -112,6 +112,7 @@ public class PeanutGraphics : IDisposable
                 Console.WriteLine(SilkMarshal.PtrToString((nint)msg.PDescription));
             });
         }
+        // Init ImGui.
         ImGuiFontConfig fontConfig = new ImGuiFontConfig("C:\\Windows\\Fonts\\arial.ttf", 16, ptr => ptr.Fonts.GetGlyphRangesDefault());
         controller = new ImGuiDX11Controller(device, deviceContext, window, input, instance, fontConfig);
 
@@ -196,9 +197,6 @@ public class PeanutGraphics : IDisposable
             MaxDepth = 1.0f
         };
         deviceContext.RSSetViewports(1u, in viewport);
-        
-        // Init ImGui.
-        // instance.ImGui_ImplDX11_Init(device, deviceContext);
     }
 
     public unsafe void OnFramebufferResize(Vector2D<int> newSize)
@@ -275,8 +273,6 @@ public class PeanutGraphics : IDisposable
     
     public void Dispose()
     {
-        // Dispose of ImGui.
-        // _instance.ImGui_ImplDX11_Shutdown();
         // Clean up any resources.
         factory.Dispose();
         swapchain.Dispose();
