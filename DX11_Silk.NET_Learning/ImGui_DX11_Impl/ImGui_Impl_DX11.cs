@@ -161,11 +161,9 @@ public sealed class ImGui_Impl_DX11
             {
                 Console.WriteLine(SilkMarshal.PtrToString((nint) errorBlob.GetBufferPointer()));
             }
-
             hr.Throw();
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
         }
-
         try
         {
             SilkMarshal.ThrowHResult(
@@ -283,7 +281,6 @@ public sealed class ImGui_Impl_DX11
             {
                 Console.WriteLine(SilkMarshal.PtrToString((nint) errorBlob.GetBufferPointer()));
             }
-
             hr.Throw();
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
         }
@@ -383,10 +380,7 @@ public sealed class ImGui_Impl_DX11
     /// <param name="displaySize">
     /// Size of the display for viewport setup.
     /// </param>
-    /// <param name="deviceContext">
-    /// D3D11 device context pointer.
-    /// </param>
-    private unsafe void ImGui_ImplDX11_SetupRenderState(Vector2 displaySize, ID3D11DeviceContext* deviceContext)
+    private unsafe void ImGui_ImplDX11_SetupRenderState(Vector2 displaySize)
     {
         // Setup viewport
         Viewport vp = new Viewport
@@ -397,37 +391,37 @@ public sealed class ImGui_Impl_DX11
             MaxDepth = 1.0f
         };
         vp.TopLeftX = vp.TopLeftY = 0;
-        deviceContext->RSSetViewports(1, in vp);
+        pd3dDeviceContext.RSSetViewports(1, in vp);
 
         // Setup shader and vertex buffers
         uint stride = (uint)sizeof(ImDrawVert);
         uint offset = 0;
         
-        deviceContext->IASetInputLayout(pInputLayout);
-        deviceContext->IASetVertexBuffers(0, 1, ref pVB, in stride, in offset);
+        pd3dDeviceContext.IASetInputLayout(pInputLayout);
+        pd3dDeviceContext.IASetVertexBuffers(0, 1, ref pVB, in stride, in offset);
         // WARNING there, ImDrawIdx is not defined by ImGui.NET, and uses R16_UINT by default (16-bit indices, aka ushort)
         // Using R32_UINT would require recompiling cimgui with the correct define
         // See https://github.com/ImGuiNET/ImGui.NET/issues/248
-        // Original code: https://github.com/ocornut/imgui/blob/master/imgui.h#L260
-        deviceContext->IASetIndexBuffer(pIB, Format.FormatR16Uint, 0);
-        deviceContext->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
-        deviceContext->VSSetShader(pVertexShader, null, 0);
-        deviceContext->VSSetConstantBuffers(0, 1, ref pVertexConstantBuffer);
-        deviceContext->PSSetShader(pPixelShader, null, 0);
-        deviceContext->PSSetSamplers(0, 1, ref pFontSampler);
-        deviceContext->GSSetShader(null, null, 0);
-        deviceContext->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-        deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-        deviceContext->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        // Original code: https://github.com/ocornut/imgui/blob/v1.91.6/imgui.h#L259
+        pd3dDeviceContext.IASetIndexBuffer(pIB, Format.FormatR16Uint, 0);
+        pd3dDeviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
+        pd3dDeviceContext.VSSetShader(pVertexShader, null, 0);
+        pd3dDeviceContext.VSSetConstantBuffers(0, 1, ref pVertexConstantBuffer);
+        pd3dDeviceContext.PSSetShader(pPixelShader, null, 0);
+        pd3dDeviceContext.PSSetSamplers(0, 1, ref pFontSampler);
+        pd3dDeviceContext.GSSetShader(ref Unsafe.NullRef<ID3D11GeometryShader>(), null, 0);
+        pd3dDeviceContext.HSSetShader(ref Unsafe.NullRef<ID3D11HullShader>(), null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        pd3dDeviceContext.DSSetShader(ref Unsafe.NullRef<ID3D11DomainShader>(), null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+        pd3dDeviceContext.CSSetShader(ref Unsafe.NullRef<ID3D11ComputeShader>(), null, 0); // In theory we should backup and restore this as well.. very infrequently used..
 
         // Setup blend state
         float[] blendFactor = [0f, 0f, 0f, 0f];
         fixed (float* blendFactorPtr = blendFactor)
         {
-            deviceContext->OMSetBlendState(pBlendState, blendFactorPtr, 0xffffffff);
+            pd3dDeviceContext.OMSetBlendState(pBlendState, blendFactorPtr, 0xffffffff);
         }
-        deviceContext->OMSetDepthStencilState(pDepthStencilState, 0);
-        deviceContext->RSSetState(pRasterizerState);
+        pd3dDeviceContext.OMSetDepthStencilState(pDepthStencilState, 0);
+        pd3dDeviceContext.RSSetState(pRasterizerState);
     }
     
     /// <summary>
@@ -445,8 +439,6 @@ public sealed class ImGui_Impl_DX11
         // Avoid rendering when minimized
         if (drawDataPtr.DisplaySize.X <= 0.0f || drawDataPtr.DisplaySize.Y <= 0.0f)
             return;
-
-        ID3D11DeviceContext* deviceCtx = pd3dDeviceContext;
 
         // Create and grow vertex/index buffers if needed
         if ((long)pVB.Handle == IntPtr.Zero || vertexBufferSize < drawDataPtr.TotalVtxCount)
@@ -493,9 +485,9 @@ public sealed class ImGui_Impl_DX11
         MappedSubresource vtxResource = default;
         MappedSubresource idxResource = default;
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pVB, 0, Map.WriteDiscard, 0, ref vtxResource));
+            pd3dDeviceContext.Map(pVB, 0, Map.WriteDiscard, 0, ref vtxResource));
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pIB, 0, Map.WriteDiscard, 0, ref idxResource));
+            pd3dDeviceContext.Map(pIB, 0, Map.WriteDiscard, 0, ref idxResource));
         // TODO: Check those casts, should be fine but idk
         ImDrawVert* vtxDstResource = (ImDrawVert*)vtxResource.PData;
         ushort* idxDstResource = (ushort*)idxResource.PData;
@@ -507,14 +499,14 @@ public sealed class ImGui_Impl_DX11
             vtxDstResource += drawListPtr.VtxBuffer.Size;
             idxDstResource += drawListPtr.IdxBuffer.Size;
         }
-        deviceCtx->Unmap(pVB, 0);
-        deviceCtx->Unmap(pIB, 0);
+        pd3dDeviceContext.Unmap(pVB, 0);
+        pd3dDeviceContext.Unmap(pIB, 0);
 
         // Setup orthographic projection matrix into our constant buffer
         // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
         MappedSubresource mappedResource = default;
         SilkMarshal.ThrowHResult(
-            deviceCtx->Map(pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mappedResource));
+            pd3dDeviceContext.Map(pVertexConstantBuffer, 0, Map.WriteDiscard, 0, ref mappedResource));
         VERTEX_CONSTANT_BUFFER_DX11* constantBuffer = (VERTEX_CONSTANT_BUFFER_DX11*)mappedResource.PData;
         float L = drawDataPtr.DisplayPos.X;
         float R = drawDataPtr.DisplayPos.X + drawDataPtr.DisplaySize.X;
@@ -527,31 +519,31 @@ public sealed class ImGui_Impl_DX11
             (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f
         );
         Unsafe.CopyBlock(Unsafe.AsPointer(ref constantBuffer->mvp), Unsafe.AsPointer(ref mvp), (uint)sizeof(Matrix4X4<float>));
-        deviceCtx->Unmap(pVertexConstantBuffer, 0);
+        pd3dDeviceContext.Unmap(pVertexConstantBuffer, 0);
 
         // Backup previous DX11 state
         BACKUP_DX11_STATE old = new BACKUP_DX11_STATE();
         old.ScissorRectsCount = old.ViewportsCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        deviceCtx->RSGetScissorRects(ref old.ScissorRectsCount, old.ScissorRects);
-        deviceCtx->RSGetViewports(ref old.ViewportsCount, old.Viewports);
-        deviceCtx->RSGetState(ref old.RS);
-        deviceCtx->OMGetBlendState(ref old.BlendState, old.BlendFactor, ref old.SampleMask);
-        deviceCtx->OMGetDepthStencilState(ref old.DepthStencilState, ref old.StencilRef);
-        deviceCtx->PSGetShaderResources(0, 1, ref old.PSShaderResource);
-        deviceCtx->PSGetSamplers(0, 1, ref old.PSSampler);
+        pd3dDeviceContext.RSGetScissorRects(ref old.ScissorRectsCount, old.ScissorRects);
+        pd3dDeviceContext.RSGetViewports(ref old.ViewportsCount, old.Viewports);
+        pd3dDeviceContext.RSGetState(ref old.RS);
+        pd3dDeviceContext.OMGetBlendState(ref old.BlendState, old.BlendFactor, ref old.SampleMask);
+        pd3dDeviceContext.OMGetDepthStencilState(ref old.DepthStencilState, ref old.StencilRef);
+        pd3dDeviceContext.PSGetShaderResources(0, 1, ref old.PSShaderResource);
+        pd3dDeviceContext.PSGetSamplers(0, 1, ref old.PSSampler);
         old.PSInstancesCount = old.VSInstancesCount = old.GSInstancesCount = 256;
-        deviceCtx->PSGetShader(ref old.PS, ref old.PSInstances, ref old.PSInstancesCount);
-        deviceCtx->VSGetShader(ref old.VS, ref old.VSInstances, ref old.VSInstancesCount);
-        deviceCtx->VSGetConstantBuffers(0, 1, ref old.VSConstantBuffer);
-        deviceCtx->GSGetShader(ref old.GS, ref old.GSInstances, ref old.GSInstancesCount);
+        pd3dDeviceContext.PSGetShader(ref old.PS, ref old.PSInstances, ref old.PSInstancesCount);
+        pd3dDeviceContext.VSGetShader(ref old.VS, ref old.VSInstances, ref old.VSInstancesCount);
+        pd3dDeviceContext.VSGetConstantBuffers(0, 1, ref old.VSConstantBuffer);
+        pd3dDeviceContext.GSGetShader(ref old.GS, ref old.GSInstances, ref old.GSInstancesCount);
         
-        deviceCtx->IAGetPrimitiveTopology(ref old.PrimitiveTopology);
-        deviceCtx->IAGetIndexBuffer(ref old.IndexBuffer, ref old.IndexBufferFormat, ref old.IndexBufferOffset);
-        deviceCtx->IAGetVertexBuffers(0, 1, ref old.VertexBuffer, ref old.VertexBufferStride, ref old.VertexBufferOffset);
-        deviceCtx->IAGetInputLayout(ref old.InputLayout);
+        pd3dDeviceContext.IAGetPrimitiveTopology(ref old.PrimitiveTopology);
+        pd3dDeviceContext.IAGetIndexBuffer(ref old.IndexBuffer, ref old.IndexBufferFormat, ref old.IndexBufferOffset);
+        pd3dDeviceContext.IAGetVertexBuffers(0, 1, ref old.VertexBuffer, ref old.VertexBufferStride, ref old.VertexBufferOffset);
+        pd3dDeviceContext.IAGetInputLayout(ref old.InputLayout);
 
         // Setup desired DX state
-        ImGui_ImplDX11_SetupRenderState(drawDataPtr.DisplaySize, deviceCtx);
+        ImGui_ImplDX11_SetupRenderState(drawDataPtr.DisplaySize);
 
         // Render command lists
         // (Because we merged all buffers into a single one, we maintain our own offset into them)
@@ -578,56 +570,52 @@ public sealed class ImGui_Impl_DX11
 
                     // Apply scissor/clipping rectangle
                     Box2D<int> r = new Box2D<int>((int)clipMin.X, (int)clipMin.Y, (int)clipMax.X, (int)clipMax.Y);
-                    deviceCtx->RSSetScissorRects(1, in r);
+                    pd3dDeviceContext.RSSetScissorRects(1, in r);
 
                     // Bind texture, Draw
-                    // TODO: This line made the program crash, because the font atlas texture was not generated and bound correctly
+                    // Moved this line out of the for loop since it caused issues
                     // ID3D11ShaderResourceView* texture_srv = (ID3D11ShaderResourceView*)pcmd.TextureId;
-                    // deviceCtx->PSSetShaderResources(0, 1, &texture_srv);
-                    deviceCtx->DrawIndexed(drawCmdPtr.ElemCount, (uint)(drawCmdPtr.IdxOffset + globalIdxOffset), (int)(drawCmdPtr.VtxOffset + globalVtxOffset));
+                    // pd3dDeviceContext.PSSetShaderResources(0, 1, &texture_srv);
+                    pd3dDeviceContext.DrawIndexed(drawCmdPtr.ElemCount, (uint)(drawCmdPtr.IdxOffset + globalIdxOffset), (int)(drawCmdPtr.VtxOffset + globalVtxOffset));
                 }
             }
             globalIdxOffset += drawListPtr.IdxBuffer.Size;
             globalVtxOffset += drawListPtr.VtxBuffer.Size;
         }
+        // Moved font texture binding out of the for loop
+        pd3dDeviceContext.PSSetShaderResources(0u, 1u, ref pFontTextureView);
 
         // Restore modified DX state
-        deviceCtx->RSSetScissorRects(old.ScissorRectsCount, old.ScissorRects);
-        // TODO: Solve viewports issue
-        // deviceCtx->RSSetViewports(old.ViewportsCount, old.Viewports);
-        deviceCtx->RSSetState(old.RS);
+        pd3dDeviceContext.RSSetScissorRects(old.ScissorRectsCount, old.ScissorRects);
+        // TODO: Solve viewports issue, throws nullptrException
+        // pd3dDeviceContext.RSSetViewports(old.ViewportsCount, old.Viewports);
+        pd3dDeviceContext.RSSetState(old.RS);
         if (old.RS != null) old.RS->Release();
-        deviceCtx->OMSetBlendState(old.BlendState, old.BlendFactor, old.SampleMask);
+        pd3dDeviceContext.OMSetBlendState(old.BlendState, old.BlendFactor, old.SampleMask);
         if (old.BlendState != null) old.BlendState->Release();
-        deviceCtx->OMSetDepthStencilState(old.DepthStencilState, old.StencilRef);
+        pd3dDeviceContext.OMSetDepthStencilState(old.DepthStencilState, old.StencilRef);
         if (old.DepthStencilState != null) old.DepthStencilState->Release();
-        deviceCtx->PSSetShaderResources(0, 1, in old.PSShaderResource);
+        pd3dDeviceContext.PSSetShaderResources(0, 1, in old.PSShaderResource);
         if (old.PSShaderResource != null) old.PSShaderResource->Release();
-        deviceCtx->PSSetSamplers(0, 1, in old.PSSampler);
+        pd3dDeviceContext.PSSetSamplers(0, 1, in old.PSSampler);
         if (old.PSSampler != null) old.PSSampler->Release();
-        deviceCtx->PSSetShader(old.PS, old.PSInstances, old.PSInstancesCount);
+        pd3dDeviceContext.PSSetShader(old.PS, old.PSInstances, old.PSInstancesCount);
         if (old.PS != null) old.PS->Release();
-        // TODO: Handle arrays of PSInstances
-        // for (uint i = 0; i < old.PSInstancesCount; i++)
-        // {
-            if (old.PSInstances.Handle != null) old.PSInstances.Release();
-        // }
-        deviceCtx->VSSetShader(old.VS, old.VSInstances, old.VSInstancesCount);
+        if (old.PSInstances.Handle != null) old.PSInstances.Release();
+        pd3dDeviceContext.VSSetShader(old.VS, old.VSInstances, old.VSInstancesCount);
         if (old.VS != null) old.VS->Release();
-        deviceCtx->VSSetConstantBuffers(0, 1, in old.VSConstantBuffer);
+        if (old.VSInstances.Handle != null) old.VSInstances.Release();
+        pd3dDeviceContext.VSSetConstantBuffers(0, 1, in old.VSConstantBuffer);
         if (old.VSConstantBuffer != null) old.VSConstantBuffer->Release();
-        deviceCtx->GSSetShader(old.GS, old.GSInstances, old.GSInstancesCount);
+        pd3dDeviceContext.GSSetShader(old.GS, old.GSInstances, old.GSInstancesCount);
         if (old.GS != null) old.GS->Release();
-        // for (uint i = 0; i < old.VSInstancesCount; i++)
-        // {
-            if (old.VSInstances.Handle != null) old.VSInstances.Release();
-        // }
-        deviceCtx->IASetPrimitiveTopology(old.PrimitiveTopology);
-        deviceCtx->IASetIndexBuffer(old.IndexBuffer, old.IndexBufferFormat, old.IndexBufferOffset);
+        if (old.GSInstances.Handle != null) old.GSInstances.Release();
+        pd3dDeviceContext.IASetPrimitiveTopology(old.PrimitiveTopology);
+        pd3dDeviceContext.IASetIndexBuffer(old.IndexBuffer, old.IndexBufferFormat, old.IndexBufferOffset);
         if (old.IndexBuffer != null) old.IndexBuffer->Release();
-        deviceCtx->IASetVertexBuffers(0, 1, in old.VertexBuffer, in old.VertexBufferStride, in old.VertexBufferOffset);
+        pd3dDeviceContext.IASetVertexBuffers(0, 1, in old.VertexBuffer, in old.VertexBufferStride, in old.VertexBufferOffset);
         if (old.VertexBuffer != null) old.VertexBuffer->Release();
-        deviceCtx->IASetInputLayout(old.InputLayout);
+        pd3dDeviceContext.IASetInputLayout(old.InputLayout);
         if (old.InputLayout != null) old.InputLayout->Release();
     }
     

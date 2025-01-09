@@ -23,10 +23,11 @@ public class ImGuiDX11Controller
 
     public IntPtr ImGuiContext;
 
+    // TODO: Implement overloads for all numbered types of ID3D11Device and ID3D11DeviceContext
     /// <summary>
     /// Constructs a new ImGuiController with font configuration and onConfigure Action.
     /// </summary>
-    public unsafe ImGuiDX11Controller(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext,
+    public unsafe ImGuiDX11Controller(ID3D11Device* device, ID3D11DeviceContext* deviceContext,
         IView view, IInputContext input,
         ImGuiFontConfig? imGuiFontConfig = null, Action onConfigureIO = null)
     {
@@ -151,8 +152,6 @@ public class ImGuiDX11Controller
             _frameBegun = false;
             ImGui.Render();
             instance.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
-            // ImGui_Impl_DX11.ImGui_ImplDX11_RenderDrawData(ImGui.GetDrawData());
-            // RenderImDrawData(ImGui.GetDrawData());
 
             if (oldCtx != ImGuiContext)
             {

@@ -1,12 +1,4 @@
-﻿/////////////////////////////////////////////////////// PLEASE READ! ///////////////////////////////////////////////////
-// This provides a basic example of using our Direct3D 11 bindings in their current form. These bindings are still    //
-// improving over time, and as a result the content of this example may change.                                       //
-// Notably:                                                                                                           //
-// TODO remove Unsafe.NullRef once we've updated the bindings to not require it                                       //
-// TODO investigate making the D3DPrimitiveTopology enum more user friendly                                           //
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-using System.Numerics;
+﻿using System.Numerics;
 using DX11_Silk.NET_Learning.ImGui_DX11_Impl;
 using ImGuiNET;
 using Silk.NET.Input;
@@ -107,7 +99,7 @@ public class PeanutWindow
     {
         // Here all of the updates to program state ahead of rendering (e.g. physics) should be done. We don't have anything
         // to do here at the moment, so we've left it blank.
-        cameraPos.X += cameraDir.X * (float)deltaSeconds * cameraSpeed;
+        cameraPos.X += cameraDir.X * (float)deltaSeconds * cameraSpeed; 
         cameraPos.Y += cameraDir.Y * (float)deltaSeconds * cameraSpeed;
     }
 
