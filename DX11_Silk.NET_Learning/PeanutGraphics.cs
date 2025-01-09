@@ -15,7 +15,6 @@ namespace DX11_Silk.NET_Learning;
 
 public class PeanutGraphics : IDisposable
 {
-    private readonly ImGui_Impl_DX11 _instance;
     public Matrix4x4 ProjectionMatrix { get; set; }
     
     private float[] backgroundColor = [0.2f, 0.2f, 0.2f, 1.0f];
@@ -50,9 +49,8 @@ public class PeanutGraphics : IDisposable
 
     private List<Drawable> boxes = [];
 
-    public unsafe PeanutGraphics(IView window, Vector2D<int> FramebufferSize, ref ImGui_Impl_DX11 instance, ref ImGuiDX11Controller controller, ref IInputContext input)
+    public unsafe PeanutGraphics(IView window, ref ImGuiDX11Controller controller, ref IInputContext input)
     {
-        // _instance = instance;
         // Whether or not to force use of DXVK on platforms where native DirectX implementations are available
         const bool forceDxvk = false;
 
@@ -114,7 +112,7 @@ public class PeanutGraphics : IDisposable
         }
         // Init ImGui.
         ImGuiFontConfig fontConfig = new ImGuiFontConfig("C:\\Windows\\Fonts\\arial.ttf", 16, ptr => ptr.Fonts.GetGlyphRangesDefault());
-        controller = new ImGuiDX11Controller(device, deviceContext, window, input, instance, fontConfig);
+        controller = new ImGuiDX11Controller(device, deviceContext, window, input, fontConfig);
 
         // Obtain the framebuffer for the swapchain's backbuffer.
         // Gets released when the execution leaves the scope thanks to using.
@@ -139,7 +137,7 @@ public class PeanutGraphics : IDisposable
         }
 
         ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(
-            1, FramebufferSize.Y / (float)FramebufferSize.X, 0.5f, 100.0f);
+            1, window.FramebufferSize.Y / (float)window.FramebufferSize.X, 0.5f, 100.0f);
 
         // Create depth stencil state
         DepthStencilDesc depthStencilDesc = new DepthStencilDesc()
@@ -158,8 +156,8 @@ public class PeanutGraphics : IDisposable
         ComPtr<ID3D11Texture2D> depthStencilBuffer = default;
         Texture2DDesc depthStencilBufferDesc = new Texture2DDesc()
         {
-            Width = (uint) FramebufferSize.X,
-            Height = (uint) FramebufferSize.Y,
+            Width = (uint) window.FramebufferSize.X,
+            Height = (uint) window.FramebufferSize.Y,
             MipLevels = 1,
             ArraySize = 1,
             Format = Format.FormatD32Float,
@@ -191,8 +189,8 @@ public class PeanutGraphics : IDisposable
         {
             TopLeftX = 0,
             TopLeftY = 0,
-            Width = FramebufferSize.X,
-            Height = FramebufferSize.Y,
+            Width = window.FramebufferSize.X,
+            Height = window.FramebufferSize.Y,
             MinDepth = 0.0f,
             MaxDepth = 1.0f
         };
@@ -229,7 +227,6 @@ public class PeanutGraphics : IDisposable
         
         ProjectionMatrix = Matrix4x4.CreatePerspectiveLeftHanded(
             1, newSize.Y / (float)newSize.X, 0.5f, 100.0f);
-
     }
     
     public unsafe void BeginFrame(double deltaSeconds)

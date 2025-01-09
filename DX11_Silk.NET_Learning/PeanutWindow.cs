@@ -29,7 +29,6 @@ public class PeanutWindow
     
     private PeanutGraphics? graphics;
 
-    private ImGui_Impl_DX11 instance;
     private ImGuiDX11Controller controller;
 
     public PeanutWindow()
@@ -49,8 +48,7 @@ public class PeanutWindow
         window = Window.Create(options);
         
         controller = null;
-        instance = new ImGui_Impl_DX11();
-
+        
         // Assign events.
         window.Load += OnLoad;
         window.Update += OnUpdate;
@@ -96,7 +94,7 @@ public class PeanutWindow
         // ImGui.GetIO().ConfigDebugIsDebuggerPresent = true;
         
         // Create a graphics object.
-        graphics = new PeanutGraphics(window!, window!.FramebufferSize, ref instance, ref controller, ref input);
+        graphics = new PeanutGraphics(window!, ref controller, ref input);
     }
 
 
